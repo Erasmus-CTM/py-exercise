@@ -172,7 +172,7 @@
       '</div>';
   }
 
-  function renderResult(area, data, label) {
+  function renderResult(area, data, label, showHints) {
     var html = '';
 
     if (data.student_error) {
@@ -226,12 +226,12 @@
         } else {
           html +=
             '<li class="py-test-fail">✗ Test ' + (i + 1) +
-            (t.message ? ': ' + escapeHtml(t.message) : '') +
+            (showHints !== false && t.message ? ': ' + escapeHtml(t.message) : '') +
             '</li>';
         }
       });
       html += '</ul>';
-    } else if (!allPass && tests[0] && tests[0].message) {
+    } else if (!allPass && showHints !== false && tests[0] && tests[0].message) {
       html += '<div class="py-exercise-hint">' + escapeHtml(tests[0].message) + '</div>';
     }
 
@@ -254,6 +254,7 @@
     var forbiddenImports  = exerciseData.forbiddenImports  || [];
     var forbiddenKeywords = exerciseData.forbiddenKeywords || [];
     var label             = exerciseData.label;
+    var showHints         = exerciseData.showTestHints !== false;
 
     // Monaco editor container
     var editorContainer = document.createElement('div');
@@ -339,7 +340,7 @@
         await mainPyodide.loadPackagesFromImports(studentCode);
         var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
-        renderResult(resultArea, data, label);
+        renderResult(resultArea, data, label, showHints);
 
       } catch (err) {
         resultArea.innerHTML =

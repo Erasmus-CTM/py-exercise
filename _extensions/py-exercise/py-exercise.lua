@@ -42,6 +42,9 @@ local globalForbiddenKeywords = {}
 local submissionEnabled = false
 local submissionKey     = "py-exercise"
 
+-- Whether failed tests reveal their assertion message (default: true)
+local globalShowTestHints = true
+
 ----
 -- Helper: read a file that lives next to this .lua filter
 ----
@@ -150,6 +153,10 @@ function Meta(meta)
     submissionKey = pandoc.utils.stringify(cfg["submission-key"])
   end
 
+  if cfg["show-test-hints"] then
+    globalShowTestHints = not (pandoc.utils.stringify(cfg["show-test-hints"]) == "false")
+  end
+
   return meta
 end
 
@@ -173,14 +180,21 @@ function CodeBlock(el)
   local forbiddenImports  = mergeLists(globalForbiddenImports,  cellForbiddenImports)
   local forbiddenKeywords = mergeLists(globalForbiddenKeywords, cellForbiddenKeywords)
 
+  -- Per-cell show-hints: "false" disables hints; anything else (or absent) keeps global default
+  local cellShowTestHints = globalShowTestHints
+  if opts["show-test-hints"] then
+    cellShowTestHints = not (opts["show-test-hints"] == "false")
+  end
+
   local exerciseData = {
-    id               = exerciseCounter,
-    starter          = starter,
-    tests            = tests,
-    label            = opts["label"]   or divId,
-    caption          = opts["caption"] or nil,
-    forbiddenImports = forbiddenImports,
+    id                = exerciseCounter,
+    starter           = starter,
+    tests             = tests,
+    label             = opts["label"]   or divId,
+    caption           = opts["caption"] or nil,
+    forbiddenImports  = forbiddenImports,
     forbiddenKeywords = forbiddenKeywords,
+    showTestHints     = cellShowTestHints,
   }
 
   local dataJson = quarto.json.encode(exerciseData)

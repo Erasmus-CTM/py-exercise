@@ -107,6 +107,7 @@ Options are set with `#|` comments at the top of the code block:
 | `caption`             | *(none)*        | Short title shown above the editor                 |
 | `forbidden-imports`   | *(none)*        | Comma-separated list of forbidden module names     |
 | `forbidden-keywords`  | *(none)*        | Comma-separated list of forbidden functions / keywords |
+| `show-test-hints`     | `true`          | Set to `false` to hide assertion messages on failed tests |
 
 ````markdown
 ```{py-exercise}
