@@ -266,6 +266,63 @@ json.dumps(_results)
 
 ---
 
+### 5. Submission export (optional)
+
+When enabled, the page gains two input fields (Student-ID, Quiz-ID) above the first
+exercise and an **Ergebnis exportieren** button below the last exercise.
+Clicking the button produces an encoded string that the student copies and submits.
+
+#### Activating submission mode
+
+```yaml
+---
+py-exercise:
+  submission: true
+  submission-key: "my-secret-key-2026"   # choose any string; defaults to "py-exercise"
+---
+```
+
+The encoded string contains:
+
+```json
+{
+  "v": 1,
+  "sid": "<Student-ID>",
+  "qid": "<Quiz-ID>",
+  "ts":  "<ISO timestamp>",
+  "results": [
+    { "label": "task-add",  "passed": 3, "total": 4, "tests": [true, true, true, false] },
+    { "label": "task-sort", "passed": 2, "total": 2, "tests": [true, true] }
+  ]
+}
+```
+
+#### Encoding scheme
+
+`JSON → UTF-8 bytes → XOR with cycling key → Base64`
+
+The scheme is reversible but not immediately obvious. Anyone viewing the page source can
+read the key, so this is intended for discouraging casual tampering, not for
+cryptographic security. Do not use for high-stakes assessments.
+
+#### Decoding submissions (instructor script)
+
+```python
+import json, base64
+
+def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
+    key_bytes   = key.encode("utf-8")
+    xored       = base64.b64decode(encoded)
+    raw         = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
+    return json.loads(raw.decode("utf-8"))
+
+# Example
+data = decode_submission("...", key="my-secret-key-2026")
+print(data["sid"], data["results"])
+```
+
+---
+
 ## Writing good tests
 
 - Use plain `assert` statements. Each statement is one test and is reported individually.

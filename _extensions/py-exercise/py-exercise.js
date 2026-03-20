@@ -5,10 +5,6 @@
   // Utilities
   // ---------------------------------------------------------------------------
 
-  // Poll until mainPyodide is available.
-  // The pyodide extension sets globalThis.mainPyodide when loading is complete.
-  // Monaco is loaded lazily inside each cell via require(['vs/editor/editor.main'], ...)
-  // so we do not need to wait for a window.monaco global here.
   function waitForReady(callback) {
     if (typeof mainPyodide !== 'undefined') {
       callback();
@@ -26,26 +22,25 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Submission state
+  // ---------------------------------------------------------------------------
+
+  // Filled in from window.__pyExerciseConfig (injected by Lua filter)
+  var submissionConfig = (window.__pyExerciseConfig) || { submission: false, submissionKey: 'py-exercise' };
+
+  // Map of exercise label → { label, passed, total, tests: [bool, ...] }
+  // Updated after every successful check run.
+  var exerciseResults = {};
+
+  // ---------------------------------------------------------------------------
   // Python: AST-based violation checker
   // ---------------------------------------------------------------------------
-  // Runs before the student code is executed.
-  // Reads _exercise_forbidden_imports and _exercise_forbidden_keywords from
-  // Pyodide globals (set by JS as Python lists before each check).
-  // Returns a JSON array of violation message strings (empty = no violations).
-  //
-  // Checked constructs:
-  //   forbidden-imports  → ast.Import / ast.ImportFrom nodes
-  //   forbidden-keywords → ast.Call (function / method names)
-  //                        + statement-level keywords mapped to AST node types:
-  //                          for, while, with, lambda, class, global, nonlocal,
-  //                          try, raise, del, assert, yield
   var CHECKER_PY = [
     'import ast as _ast, json as _json',
     '',
     '_fi = list(_exercise_forbidden_imports)',
     '_fk = list(_exercise_forbidden_keywords)',
     '',
-    '# Map keyword names to their AST node type(s)',
     '_KW_NODES = {',
     '    "for":      _ast.For,',
     '    "while":    _ast.While,',
@@ -72,21 +67,16 @@
     'try:',
     '    _tree = _ast.parse(_exercise_student_code)',
     '    for _node in _ast.walk(_tree):',
-    '',
-    '        # --- Forbidden imports ---',
     '        if isinstance(_node, _ast.Import):',
     '            for _a in _node.names:',
     '                _top = _a.name.split(".")[0]',
     '                if _top in _fi:',
     '                    _add(f"Verbotener Import: \'{_top}\'")',
-    '',
     '        elif isinstance(_node, _ast.ImportFrom):',
     '            if _node.module:',
     '                _top = _node.module.split(".")[0]',
     '                if _top in _fi:',
     '                    _add(f"Verbotener Import: \'{_top}\'")',
-    '',
-    '        # --- Forbidden function / method calls ---',
     '        elif isinstance(_node, _ast.Call):',
     '            if isinstance(_node.func, _ast.Name):',
     '                if _node.func.id in _fk:',
@@ -94,15 +84,12 @@
     '            elif isinstance(_node.func, _ast.Attribute):',
     '                if _node.func.attr in _fk:',
     '                    _add(f"Verbotene Methode: \'.{_node.func.attr}\'")',
-    '',
-    '        # --- Forbidden statement-level keywords ---',
     '        else:',
     '            for _kw, _nt in _KW_NODES.items():',
     '                if _kw in _fk and isinstance(_node, _nt):',
     '                    _add(f"Verbotenes Schlüsselwort: \'{_kw}\'")',
-    '',
     'except SyntaxError:',
-    '    pass  # syntax errors are reported by the main runner',
+    '    pass',
     '',
     '_json.dumps(_violations)',
   ].join('\n');
@@ -110,16 +97,12 @@
   // ---------------------------------------------------------------------------
   // Python: main runner
   // ---------------------------------------------------------------------------
-  // Executes student code in an isolated namespace, captures stdout,
-  // then runs each test statement individually for per-test feedback.
-  // Reads _exercise_student_code and _exercise_test_code from Pyodide globals.
   var RUNNER_PY = [
     'import ast, json, io, sys, traceback',
     '',
     '_ns = {}',
     '_results = {"student_error": None, "stdout": "", "tests": []}',
     '',
-    '# Run student code and capture its stdout',
     '_buf = io.StringIO()',
     '_old_stdout = sys.stdout',
     'sys.stdout = _buf',
@@ -132,7 +115,6 @@
     'finally:',
     '    sys.stdout = _old_stdout',
     '',
-    '# Run each test statement individually for per-test feedback',
     'if _results["student_error"] is None:',
     '    try:',
     '        _tree = ast.parse(_exercise_test_code)',
@@ -158,6 +140,20 @@
   ].join('\n');
 
   // ---------------------------------------------------------------------------
+  // Python: submission encoder
+  // ---------------------------------------------------------------------------
+  // Encoding: JSON → UTF-8 bytes → XOR with cycling key → Base64.
+  // Decoding requires knowing both the key and the procedure.
+  var ENCODER_PY = [
+    'import json as _json, base64 as _b64',
+    '',
+    '_key  = _submission_key.encode("utf-8")',
+    '_raw  = _json.dumps(_submission_payload, ensure_ascii=False).encode("utf-8")',
+    '_xord = bytes(b ^ _key[i % len(_key)] for i, b in enumerate(_raw))',
+    '_b64.b64encode(_xord).decode("ascii")',
+  ].join('\n');
+
+  // ---------------------------------------------------------------------------
   // Result rendering
   // ---------------------------------------------------------------------------
 
@@ -172,7 +168,7 @@
       '</div>';
   }
 
-  function renderResult(area, data) {
+  function renderResult(area, data, label) {
     var html = '';
 
     if (data.student_error) {
@@ -197,8 +193,17 @@
     var total   = tests.length;
     var allPass = total > 0 && passed === total;
 
-    html += '<div class="py-exercise-summary">';
+    // Store result for submission export
+    if (label && total > 0) {
+      exerciseResults[label] = {
+        label:  label,
+        passed: passed,
+        total:  total,
+        tests:  tests.map(function (t) { return t.passed; }),
+      };
+    }
 
+    html += '<div class="py-exercise-summary">';
     if (allPass) {
       html +=
         '<div class="py-exercise-all-passed">✅ Alle ' + total +
@@ -240,10 +245,11 @@
 
     container.innerHTML = '';
 
-    var starterCode       = exerciseData.starter          || '';
-    var testsCode         = exerciseData.tests            || '';
+    var starterCode       = exerciseData.starter           || '';
+    var testsCode         = exerciseData.tests             || '';
     var forbiddenImports  = exerciseData.forbiddenImports  || [];
     var forbiddenKeywords = exerciseData.forbiddenKeywords || [];
+    var label             = exerciseData.label;
 
     // Monaco editor container
     var editorContainer = document.createElement('div');
@@ -270,12 +276,10 @@
     buttonBar.appendChild(resetBtn);
     container.appendChild(buttonBar);
 
-    // Result area
     var resultArea = document.createElement('div');
     resultArea.className = 'py-exercise-result';
     container.appendChild(resultArea);
 
-    // Monaco editor
     var editor;
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(editorContainer, {
@@ -301,9 +305,6 @@
       editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck);
     });
 
-    // -------------------------------------------------------------------------
-    // Run the check
-    // -------------------------------------------------------------------------
     async function runCheck() {
       if (!editor) return;
 
@@ -314,13 +315,11 @@
       var studentCode = editor.getValue();
 
       try {
-        // Pass all inputs to Python via globals – no string escaping needed
         mainPyodide.globals.set('_exercise_student_code',  studentCode);
         mainPyodide.globals.set('_exercise_test_code',     testsCode);
         mainPyodide.globals.set('_exercise_forbidden_imports',  mainPyodide.toPy(forbiddenImports));
         mainPyodide.globals.set('_exercise_forbidden_keywords', mainPyodide.toPy(forbiddenKeywords));
 
-        // --- Step 1: check for forbidden constructs (AST only, no execution) ---
         if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
           var violationsRaw = await mainPyodide.runPythonAsync(CHECKER_PY);
           var violations = JSON.parse(violationsRaw);
@@ -330,11 +329,10 @@
           }
         }
 
-        // --- Step 2: auto-load packages, execute student code, run tests ---
         await mainPyodide.loadPackagesFromImports(studentCode);
         var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
-        renderResult(resultArea, data);
+        renderResult(resultArea, data, label);
 
       } catch (err) {
         resultArea.innerHTML =
@@ -356,12 +354,176 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Init: wait for Pyodide, then build all registered exercises
+  // Submission UI
+  // ---------------------------------------------------------------------------
+
+  function buildSubmissionHeader() {
+    var wrap = document.createElement('div');
+    wrap.className = 'py-submission-header';
+    wrap.innerHTML =
+      '<div class="py-submission-header-inner">' +
+        '<h5 class="py-submission-title">📋 Abgabe</h5>' +
+        '<div class="py-submission-fields">' +
+          '<div class="py-submission-field">' +
+            '<label for="py-submission-student-id">Student-ID</label>' +
+            '<input type="text" id="py-submission-student-id" ' +
+                   'placeholder="z.B. s123456" autocomplete="off">' +
+          '</div>' +
+          '<div class="py-submission-field">' +
+            '<label for="py-submission-quiz-id">Quiz-ID</label>' +
+            '<input type="text" id="py-submission-quiz-id" ' +
+                   'placeholder="z.B. quiz-01" autocomplete="off">' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    return wrap;
+  }
+
+  function buildSubmissionFooter() {
+    var wrap = document.createElement('div');
+    wrap.className = 'py-submission-footer';
+
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-success py-submission-export-btn';
+    btn.innerHTML = '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren';
+    btn.type = 'button';
+    btn.onclick = exportResults;
+
+    var msg = document.createElement('div');
+    msg.className = 'py-submission-msg';
+    msg.id = 'py-submission-msg';
+
+    var outWrap = document.createElement('div');
+    outWrap.className = 'py-submission-output-wrap';
+    outWrap.id = 'py-submission-output-wrap';
+    outWrap.style.display = 'none';
+
+    var outLabelRow = document.createElement('div');
+    outLabelRow.className = 'py-submission-output-labelrow';
+
+    var outLabel = document.createElement('span');
+    outLabel.className = 'py-submission-output-label';
+    outLabel.textContent = 'Kodierten String kopieren und abgeben:';
+
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-light btn-sm py-submission-copy-btn';
+    copyBtn.id = 'py-submission-copy-btn';
+    copyBtn.type = 'button';
+    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Kopieren';
+    copyBtn.onclick = function () {
+      var text = (document.getElementById('py-submission-output') || {}).value || '';
+      if (!text) return;
+      navigator.clipboard.writeText(text).then(function () {
+        copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert!';
+        copyBtn.classList.add('py-submission-copy-ok');
+        setTimeout(function () {
+          copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Kopieren';
+          copyBtn.classList.remove('py-submission-copy-ok');
+        }, 2000);
+      });
+    };
+
+    outLabelRow.appendChild(outLabel);
+    outLabelRow.appendChild(copyBtn);
+
+    var textarea = document.createElement('textarea');
+    textarea.className = 'py-submission-output';
+    textarea.id = 'py-submission-output';
+    textarea.readOnly = true;
+    textarea.rows = 4;
+    textarea.onclick = function () { this.select(); };
+
+    outWrap.appendChild(outLabelRow);
+    outWrap.appendChild(textarea);
+
+    wrap.appendChild(btn);
+    wrap.appendChild(msg);
+    wrap.appendChild(outWrap);
+    return wrap;
+  }
+
+  async function exportResults() {
+    var studentId = (document.getElementById('py-submission-student-id') || {}).value;
+    var quizId    = (document.getElementById('py-submission-quiz-id')    || {}).value;
+
+    studentId = (studentId || '').trim();
+    quizId    = (quizId    || '').trim();
+
+    var msgEl     = document.getElementById('py-submission-msg');
+    var outWrap   = document.getElementById('py-submission-output-wrap');
+    var outArea   = document.getElementById('py-submission-output');
+
+    if (!studentId || !quizId) {
+      if (msgEl) {
+        msgEl.innerHTML =
+          '<div class="py-submission-error">Bitte Student-ID und Quiz-ID ausfüllen.</div>';
+      }
+      if (outWrap) outWrap.style.display = 'none';
+      return;
+    }
+    if (msgEl) msgEl.innerHTML = '';
+
+    // Collect results for every registered exercise (unattempted → 0/total)
+    var allResults = (window.__pyExercises || []).map(function (ex) {
+      return exerciseResults[ex.label] || {
+        label:  ex.label,
+        passed: 0,
+        total:  0,        // 0 = not attempted
+        tests:  [],
+      };
+    });
+
+    var payload = {
+      v:       1,
+      sid:     studentId,
+      qid:     quizId,
+      ts:      new Date().toISOString(),
+      results: allResults,
+    };
+
+    try {
+      mainPyodide.globals.set('_submission_payload', mainPyodide.toPy(payload));
+      mainPyodide.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
+
+      var encoded = await mainPyodide.runPythonAsync(ENCODER_PY);
+
+      if (outArea)  outArea.value = encoded;
+      if (outWrap)  outWrap.style.display = '';
+      if (msgEl)    msgEl.innerHTML = '';
+
+    } catch (err) {
+      if (msgEl) {
+        msgEl.innerHTML =
+          '<div class="py-submission-error">Fehler beim Kodieren: ' +
+          escapeHtml(String(err)) + '</div>';
+      }
+    }
+  }
+
+  function initSubmission() {
+    if (!submissionConfig.submission) return;
+
+    var cells = document.querySelectorAll('.py-exercise-cell');
+    if (cells.length === 0) return;
+
+    // Header before the first exercise cell
+    var header = buildSubmissionHeader();
+    cells[0].parentNode.insertBefore(header, cells[0]);
+
+    // Footer after the last exercise cell
+    var lastCell = cells[cells.length - 1];
+    var footer = buildSubmissionFooter();
+    lastCell.parentNode.insertBefore(footer, lastCell.nextSibling);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Init
   // ---------------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', function () {
     waitForReady(function () {
       var exercises = window.__pyExercises || [];
       exercises.forEach(setupExercise);
+      initSubmission();
     });
   });
 

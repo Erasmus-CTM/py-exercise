@@ -160,3 +160,133 @@
   margin-top: 0.5rem;
   font-size: 0.875rem;
 }
+
+/* ============================================================
+   Submission header & footer
+   ============================================================ */
+
+.py-submission-header {
+  border: 1px solid #c3cfe2;
+  border-left: 4px solid #198754;
+  border-radius: 6px;
+  background: #f0faf4;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.py-submission-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.py-submission-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.py-submission-fields {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.py-submission-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 160px;
+}
+
+.py-submission-field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #555;
+}
+
+.py-submission-field input {
+  font-size: 0.9rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.py-submission-field input:focus {
+  border-color: #198754;
+  box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.2);
+}
+
+/* Footer */
+.py-submission-footer {
+  border: 1px solid #c3cfe2;
+  border-left: 4px solid #198754;
+  border-radius: 6px;
+  background: #f0faf4;
+  padding: 1rem 1.25rem;
+  margin-top: 2rem;
+}
+
+.py-submission-export-btn {
+  font-size: 0.9rem;
+}
+
+.py-submission-msg {
+  margin-top: 0.5rem;
+}
+
+.py-submission-error {
+  color: #842029;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.py-submission-output-wrap {
+  margin-top: 0.75rem;
+}
+
+.py-submission-output-labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.py-submission-output-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.py-submission-copy-btn {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.py-submission-copy-ok {
+  background-color: #d1e7dd !important;
+  color: #0f5132 !important;
+  border-color: #badbcc !important;
+}
+
+.py-submission-output {
+  width: 100%;
+  font-family: monospace;
+  font-size: 0.78rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  resize: vertical;
+  color: #333;
+  cursor: pointer;
+}
+
