@@ -8,6 +8,6 @@ def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
 
 key = input("Enter the quarto quiz key: ")
 enc_string = input("Enter the encoded submission string: ")
-data = decode_submission(enc_string, key="demo-key-2026")
+data = decode_submission(enc_string, key=key)
 
 print(json.dumps(data,indent=4))
