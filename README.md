@@ -267,18 +267,12 @@ cryptographic security. Do not use for high-stakes assessments.
 
 #### Decoding submissions (instructor script)
 
-```python
-import json, base64
+Use the included `decode.py` script to decode a submission string on the command line.
+It will prompt you for the quiz key and the encoded submission string, then print the
+decoded JSON.
 
-def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
-    key_bytes = key.encode("utf-8")
-    xored     = base64.b64decode(encoded)
-    raw       = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
-    return json.loads(raw.decode("utf-8"))
-
-# Example
-data = decode_submission("...", key="my-secret-key-2026")
-print(data["sid"], data["results"])
+```sh
+python decode.py
 ```
 
 ---
@@ -436,3 +430,15 @@ including the Python violation/error message templates (which use `{}` as the
   seconds on the first run. Subsequent runs are fast.
 - `localStorage` persistence relies on the browser's storage quota and is not
   available in all private-browsing modes.
+
+---
+
+## Authors
+
+- Michael Kallweit
+
+---
+
+## License
+
+[GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0)
