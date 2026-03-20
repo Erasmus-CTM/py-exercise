@@ -101,12 +101,14 @@ assert add(0, 0) == 0,   "add(0, 0) sollte 0 ergeben"
 
 Options are set with `#|` comments at the top of the code block:
 
-| Option    | Default            | Description                              |
-|-----------|--------------------|------------------------------------------|
-| `label`   | `py-exercise-N`    | Unique identifier for the exercise cell  |
-| `caption` | *(none)*           | Short title shown above the editor       |
+| Option                | Default         | Description                                        |
+|-----------------------|-----------------|----------------------------------------------------|
+| `label`               | `py-exercise-N` | Unique identifier for the exercise cell            |
+| `caption`             | *(none)*        | Short title shown above the editor                 |
+| `forbidden-imports`   | *(none)*        | Comma-separated list of forbidden module names     |
+| `forbidden-keywords`  | *(none)*        | Comma-separated list of forbidden functions / keywords |
 
-```
+````markdown
 ```{py-exercise}
 #| label: task-fibonacci
 #| caption: Aufgabe – Fibonacci
@@ -117,7 +119,73 @@ assert fib(0) == 0
 assert fib(1) == 1
 assert fib(6) == 8
 ```
+````
+
+---
+
+### 4. Restricting allowed constructs
+
+You can prevent students from using certain imports, built-in functions, methods, or
+language keywords. Violations are detected **before** the code is executed (AST-only
+analysis) and shown as a yellow warning box – the code is not run at all.
+
+#### Global restrictions (apply to every exercise in the document)
+
+Set them in the document YAML front matter under the `py-exercise` key:
+
+```yaml
+---
+title: "My Exercises"
+filters:
+  - coatless-quarto/pyodide
+  - py-exercise
+py-exercise:
+  forbidden-imports:
+    - os
+    - sys
+    - subprocess
+  forbidden-keywords:
+    - eval
+    - exec
+---
 ```
+
+#### Per-exercise restrictions (extend the global lists)
+
+Use `#|` options inside the code block. Per-cell entries are **added** to the global
+list; they do not replace it.
+
+````markdown
+```{py-exercise}
+#| forbidden-imports: numpy, pandas
+#| forbidden-keywords: sum, sorted, for
+def my_sum(lst):
+    pass
+## TESTS ##
+assert my_sum([1, 2, 3]) == 6
+```
+````
+
+#### What is checked
+
+The checker uses Python's `ast` module to inspect the student's code without running it:
+
+| Entry in `forbidden-keywords` | What is blocked |
+|-------------------------------|-----------------|
+| A built-in or function name, e.g. `sorted`, `eval` | Any call `sorted(...)` or `eval(...)` |
+| A method name, e.g. `sort`, `append` | Any method call `.sort()`, `.append()` |
+| `for` | `for` loops (`ast.For`) |
+| `while` | `while` loops (`ast.While`) |
+| `lambda` | Lambda expressions |
+| `class` | Class definitions |
+| `with` | Context managers |
+| `try` | try/except blocks |
+| `raise` | `raise` statements |
+| `global` / `nonlocal` | Global/nonlocal declarations |
+| `yield` | Generator expressions |
+
+`forbidden-imports` blocks both `import os` and `from os import ...` style imports,
+matching on the top-level module name.
 
 ---
 
@@ -125,61 +193,73 @@ assert fib(6) == 8
 
 ### Lua filter (`py-exercise.lua`)
 
-The filter processes `{py-exercise}` code blocks at render time:
+The filter runs in two phases:
 
-1. Parses `#|` options and strips them from the code.
-2. Splits the remaining code on the `## TESTS ##` sentinel into `starter` and `tests`.
-3. Replaces the code block with a `<div id="py-exercise-N">` placeholder.
-4. Emits an inline `<script>` that registers the exercise data
-   (JSON-encoded via `quarto.json.encode`) into `window.__pyExercises`.
-5. Injects the extension's CSS and JS into the page exactly once.
+1. **`Meta` phase** – reads the global `py-exercise.forbidden-imports` and
+   `py-exercise.forbidden-keywords` lists from the document front matter.
+2. **`CodeBlock` phase** – for each `{py-exercise}` block:
+   - Parses `#|` options and strips them from the code.
+   - Splits the remaining code on the `## TESTS ##` sentinel into `starter` and `tests`.
+   - Merges global and per-cell forbidden lists (deduplicating).
+   - Replaces the block with a `<div id="py-exercise-N">` placeholder plus an inline
+     `<script>` that registers all exercise data (JSON-encoded) in `window.__pyExercises`.
+   - Injects the extension's CSS and JS into the page exactly once.
 
 ### JavaScript (`py-exercise.js`)
 
-On `DOMContentLoaded`, the script polls until both `mainPyodide` (set by the pyodide
-extension) and `monaco` are available, then initialises every exercise cell:
+On `DOMContentLoaded`, the script polls until `mainPyodide` is available, then
+initialises every exercise cell: creates a Monaco editor and wires up the buttons.
 
-1. Creates a Monaco editor pre-filled with the starter code.
-2. Adds **Überprüfen** and **Zurücksetzen** buttons.
+When **Überprüfen** is clicked (or Shift+Enter is pressed):
 
-When **Überprüfen** is clicked (or Shift+Enter is pressed inside the editor):
+1. All inputs are passed to Python via `mainPyodide.globals.set()` – no string escaping.
+2. **If** forbidden lists are non-empty, an AST-only checker runs first. Any violations
+   are displayed immediately and execution is aborted.
+3. Otherwise, student packages are auto-loaded, the student code is executed in an
+   isolated namespace (stdout captured), and each test `assert` is run individually.
+4. Results are rendered with per-test pass/fail feedback.
 
-1. The student's code is passed to Python via `mainPyodide.globals.set()` –
-   no string escaping needed.
-2. The student's code is executed in an isolated namespace; `print()` output is captured.
-3. Each `assert` statement in the test code is parsed individually with Python's `ast`
-   module and executed, yielding per-test pass/fail results.
-4. Results are rendered: a green summary if all tests pass, or a red summary with
-   the failing assertion messages if any test fails.
+### Python checker (AST only, no execution)
 
-### Python runner (embedded in JS)
+```python
+import ast, json
+
+_tree = ast.parse(_exercise_student_code)
+for _node in ast.walk(_tree):
+    if isinstance(_node, ast.Import):          # import os
+        ...
+    elif isinstance(_node, ast.ImportFrom):    # from os import path
+        ...
+    elif isinstance(_node, ast.Call):          # sorted(...) or lst.sort()
+        ...
+    else:                                      # for / while / lambda / ...
+        ...
+
+json.dumps(_violations)   # list of human-readable violation strings
+```
+
+### Python runner
 
 ```python
 import ast, json, io, sys, traceback
 
 _ns = {}
-_results = {"student_error": None, "stdout": "", "tests": []}
-
 _buf = io.StringIO()
 sys.stdout = _buf
 try:
     exec(compile(_exercise_student_code, "<student>", "exec"), _ns)
-    _results["stdout"] = _buf.getvalue()
 except Exception:
     _results["student_error"] = traceback.format_exc()
-    _results["stdout"] = _buf.getvalue()
 finally:
     sys.stdout = _old_stdout
 
-if _results["student_error"] is None:
-    _tree = ast.parse(_exercise_test_code)
-    for _stmt in _tree.body:
-        _single = compile(ast.Module(body=[_stmt], type_ignores=[]), "<test>", "exec")
-        try:
-            exec(_single, _ns)
-            _results["tests"].append({"passed": True})
-        except AssertionError as e:
-            _results["tests"].append({"passed": False, "message": str(e)})
+# each assert statement is compiled and run individually:
+for _stmt in ast.parse(_exercise_test_code).body:
+    try:
+        exec(compile(ast.Module(body=[_stmt], ...), "<test>", "exec"), _ns)
+        _results["tests"].append({"passed": True})
+    except AssertionError as e:
+        _results["tests"].append({"passed": False, "message": str(e)})
 
 json.dumps(_results)
 ```

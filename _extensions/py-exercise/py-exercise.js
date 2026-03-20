@@ -26,11 +26,93 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Python runner
+  // Python: AST-based violation checker
   // ---------------------------------------------------------------------------
-  // We build the runner as an array of strings to keep the source readable.
-  // Pyodide globals (_exercise_student_code, _exercise_test_code) are set by JS
-  // before each run – this avoids any string-escaping issues.
+  // Runs before the student code is executed.
+  // Reads _exercise_forbidden_imports and _exercise_forbidden_keywords from
+  // Pyodide globals (set by JS as Python lists before each check).
+  // Returns a JSON array of violation message strings (empty = no violations).
+  //
+  // Checked constructs:
+  //   forbidden-imports  → ast.Import / ast.ImportFrom nodes
+  //   forbidden-keywords → ast.Call (function / method names)
+  //                        + statement-level keywords mapped to AST node types:
+  //                          for, while, with, lambda, class, global, nonlocal,
+  //                          try, raise, del, assert, yield
+  var CHECKER_PY = [
+    'import ast as _ast, json as _json',
+    '',
+    '_fi = list(_exercise_forbidden_imports)',
+    '_fk = list(_exercise_forbidden_keywords)',
+    '',
+    '# Map keyword names to their AST node type(s)',
+    '_KW_NODES = {',
+    '    "for":      _ast.For,',
+    '    "while":    _ast.While,',
+    '    "with":     _ast.With,',
+    '    "lambda":   _ast.Lambda,',
+    '    "class":    _ast.ClassDef,',
+    '    "global":   _ast.Global,',
+    '    "nonlocal": _ast.Nonlocal,',
+    '    "try":      _ast.Try,',
+    '    "raise":    _ast.Raise,',
+    '    "del":      _ast.Delete,',
+    '    "assert":   _ast.Assert,',
+    '    "yield":    _ast.Yield,',
+    '}',
+    '',
+    '_violations = []',
+    '_seen = set()',
+    '',
+    'def _add(msg):',
+    '    if msg not in _seen:',
+    '        _seen.add(msg)',
+    '        _violations.append(msg)',
+    '',
+    'try:',
+    '    _tree = _ast.parse(_exercise_student_code)',
+    '    for _node in _ast.walk(_tree):',
+    '',
+    '        # --- Forbidden imports ---',
+    '        if isinstance(_node, _ast.Import):',
+    '            for _a in _node.names:',
+    '                _top = _a.name.split(".")[0]',
+    '                if _top in _fi:',
+    '                    _add(f"Verbotener Import: \'{_top}\'")',
+    '',
+    '        elif isinstance(_node, _ast.ImportFrom):',
+    '            if _node.module:',
+    '                _top = _node.module.split(".")[0]',
+    '                if _top in _fi:',
+    '                    _add(f"Verbotener Import: \'{_top}\'")',
+    '',
+    '        # --- Forbidden function / method calls ---',
+    '        elif isinstance(_node, _ast.Call):',
+    '            if isinstance(_node.func, _ast.Name):',
+    '                if _node.func.id in _fk:',
+    '                    _add(f"Verbotene Funktion: \'{_node.func.id}\'")',
+    '            elif isinstance(_node.func, _ast.Attribute):',
+    '                if _node.func.attr in _fk:',
+    '                    _add(f"Verbotene Methode: \'.{_node.func.attr}\'")',
+    '',
+    '        # --- Forbidden statement-level keywords ---',
+    '        else:',
+    '            for _kw, _nt in _KW_NODES.items():',
+    '                if _kw in _fk and isinstance(_node, _nt):',
+    '                    _add(f"Verbotenes Schlüsselwort: \'{_kw}\'")',
+    '',
+    'except SyntaxError:',
+    '    pass  # syntax errors are reported by the main runner',
+    '',
+    '_json.dumps(_violations)',
+  ].join('\n');
+
+  // ---------------------------------------------------------------------------
+  // Python: main runner
+  // ---------------------------------------------------------------------------
+  // Executes student code in an isolated namespace, captures stdout,
+  // then runs each test statement individually for per-test feedback.
+  // Reads _exercise_student_code and _exercise_test_code from Pyodide globals.
   var RUNNER_PY = [
     'import ast, json, io, sys, traceback',
     '',
@@ -79,10 +161,20 @@
   // Result rendering
   // ---------------------------------------------------------------------------
 
+  function renderViolations(area, violations) {
+    var items = violations.map(function (v) {
+      return '<li>' + escapeHtml(v) + '</li>';
+    }).join('');
+    area.innerHTML =
+      '<div class="py-exercise-violations">' +
+      '<strong>🚫 Nicht erlaubt:</strong>' +
+      '<ul class="py-exercise-violation-list">' + items + '</ul>' +
+      '</div>';
+  }
+
   function renderResult(area, data) {
     var html = '';
 
-    // Student code had a runtime / syntax error
     if (data.student_error) {
       area.innerHTML =
         '<div class="py-exercise-error">' +
@@ -92,7 +184,6 @@
       return;
     }
 
-    // Captured stdout from student code
     if (data.stdout && data.stdout.trim()) {
       html +=
         '<div class="py-exercise-stdout">' +
@@ -118,7 +209,6 @@
         ' Test' + (total === 1 ? '' : 's') + ' bestanden</div>';
     }
 
-    // Show individual results when there is more than one test
     if (total > 1) {
       html += '<ul class="py-exercise-test-list">';
       tests.forEach(function (t, i) {
@@ -133,7 +223,6 @@
       });
       html += '</ul>';
     } else if (!allPass && tests[0] && tests[0].message) {
-      // Single test: show the assertion message as a hint
       html += '<div class="py-exercise-hint">' + escapeHtml(tests[0].message) + '</div>';
     }
 
@@ -149,11 +238,12 @@
     var container = document.getElementById('py-exercise-' + exerciseData.id);
     if (!container) return;
 
-    // Replace noscript placeholder
     container.innerHTML = '';
 
-    var starterCode = exerciseData.starter || '';
-    var testsCode   = exerciseData.tests   || '';
+    var starterCode       = exerciseData.starter          || '';
+    var testsCode         = exerciseData.tests            || '';
+    var forbiddenImports  = exerciseData.forbiddenImports  || [];
+    var forbiddenKeywords = exerciseData.forbiddenKeywords || [];
 
     // Monaco editor container
     var editorContainer = document.createElement('div');
@@ -185,7 +275,7 @@
     resultArea.className = 'py-exercise-result';
     container.appendChild(resultArea);
 
-    // Monaco editor (loaded via RequireJS, same as the pyodide extension uses)
+    // Monaco editor
     var editor;
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(editorContainer, {
@@ -200,7 +290,6 @@
         hideCursorInOverviewRuler: true,
       });
 
-      // Auto-resize editor to content height
       var updateHeight = function () {
         var h = Math.max(80, editor.getContentHeight());
         editorContainer.style.height = h + 'px';
@@ -209,7 +298,6 @@
       editor.onDidContentSizeChange(updateHeight);
       updateHeight();
 
-      // Shift+Enter triggers the check (consistent with pyodide cells)
       editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck);
     });
 
@@ -226,13 +314,24 @@
       var studentCode = editor.getValue();
 
       try {
-        // Pass code into Python globals – no string escaping needed
-        mainPyodide.globals.set('_exercise_student_code', studentCode);
-        mainPyodide.globals.set('_exercise_test_code', testsCode);
+        // Pass all inputs to Python via globals – no string escaping needed
+        mainPyodide.globals.set('_exercise_student_code',  studentCode);
+        mainPyodide.globals.set('_exercise_test_code',     testsCode);
+        mainPyodide.globals.set('_exercise_forbidden_imports',  mainPyodide.toPy(forbiddenImports));
+        mainPyodide.globals.set('_exercise_forbidden_keywords', mainPyodide.toPy(forbiddenKeywords));
 
-        // Auto-load any packages the student imports
+        // --- Step 1: check for forbidden constructs (AST only, no execution) ---
+        if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
+          var violationsRaw = await mainPyodide.runPythonAsync(CHECKER_PY);
+          var violations = JSON.parse(violationsRaw);
+          if (violations.length > 0) {
+            renderViolations(resultArea, violations);
+            return;
+          }
+        }
+
+        // --- Step 2: auto-load packages, execute student code, run tests ---
         await mainPyodide.loadPackagesFromImports(studentCode);
-
         var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
         renderResult(resultArea, data);
@@ -257,7 +356,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Init: wait for Pyodide + Monaco, then build all registered exercises
+  // Init: wait for Pyodide, then build all registered exercises
   // ---------------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', function () {
     waitForReady(function () {

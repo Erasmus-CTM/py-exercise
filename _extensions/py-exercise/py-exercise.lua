@@ -10,12 +10,24 @@
 --   ```{py-exercise}
 --   #| label: my-task
 --   #| caption: Aufgabe 1 – Addition
+--   #| forbidden-imports: os, sys
+--   #| forbidden-keywords: sorted, for
 --   def add(a, b):
 --       pass
 --   ## TESTS ##
 --   assert add(1, 2) == 3, "add(1, 2) sollte 3 ergeben"
 --   assert add(0, 0) == 0, "add(0, 0) sollte 0 ergeben"
 --   ```
+--
+-- Global forbidden lists can be set in the document YAML front matter:
+--
+--   py-exercise:
+--     forbidden-imports:
+--       - os
+--       - sys
+--     forbidden-keywords:
+--       - sorted
+--       - for
 ----
 
 -- Inject CSS / JS only once per document
@@ -23,6 +35,10 @@ local hasExerciseSetup = false
 
 -- Unique counter across all exercises in the document
 local exerciseCounter = 0
+
+-- Global forbidden lists (read from document Meta, applied to every exercise)
+local globalForbiddenImports  = {}
+local globalForbiddenKeywords = {}
 
 ----
 -- Helper: read a file that lives next to this .lua filter
@@ -37,6 +53,59 @@ local function readFile(filename)
   local content = f:read("*a")
   f:close()
   return content
+end
+
+----
+-- Helper: convert a Pandoc MetaList or MetaInlines value to a plain Lua list of strings.
+-- Handles both YAML block lists (- item) and inline lists ([a, b, c]).
+----
+local function metaToList(value)
+  local result = {}
+  if not value then return result end
+  -- A YAML block list (- item) arrives as an array-like Lua table (integer keys).
+  -- An inline scalar or MetaInlines value has no integer key at position 1.
+  if type(value) == "table" and value[1] ~= nil then
+    for _, item in ipairs(value) do
+      local s = pandoc.utils.stringify(item):match("^%s*(.-)%s*$")
+      if s ~= "" then table.insert(result, s) end
+    end
+  else
+    -- Scalar or inline string: stringify and split on commas.
+    local s = pandoc.utils.stringify(value)
+    for item in s:gmatch("[^,]+") do
+      local trimmed = item:match("^%s*(.-)%s*$")
+      if trimmed ~= "" then table.insert(result, trimmed) end
+    end
+  end
+  return result
+end
+
+----
+-- Helper: split a comma-separated #| option string into a list of trimmed strings.
+----
+local function splitCommaList(str)
+  local result = {}
+  if not str or str == "" then return result end
+  for item in str:gmatch("[^,]+") do
+    local trimmed = item:match("^%s*(.-)%s*$")
+    if trimmed ~= "" then table.insert(result, trimmed) end
+  end
+  return result
+end
+
+----
+-- Helper: merge two lists, deduplicating by value.
+----
+local function mergeLists(base, extra)
+  local seen   = {}
+  local result = {}
+  for _, v in ipairs(base) do
+    if not seen[v] then seen[v] = true; table.insert(result, v) end
+  end
+  for _, v in ipairs(extra) do
+    if not seen[v] then seen[v] = true; table.insert(result, v) end
+  end
+  return result
 end
 
 ----
@@ -79,7 +148,6 @@ end
 -- Returns starterCode, testsCode.  testsCode is "" when no sentinel is found.
 ----
 local function splitCode(code)
-  -- Match: everything before a line that is exactly ## TESTS ## (trimmed)
   local starter, tests =
     code:match("^(.-)\n[ \t]*##[ \t]*[Tt][Ee][Ss][Tt][Ss][ \t]*##[ \t]*\n(.-)$")
   if starter then
@@ -89,7 +157,22 @@ local function splitCode(code)
 end
 
 ----
--- Main Pandoc filter: transform {py-exercise} code blocks.
+-- Phase 1 – Meta: read global forbidden lists from document YAML front matter.
+--
+--   py-exercise:
+--     forbidden-imports: [os, sys]
+--     forbidden-keywords: [sorted, for]
+----
+function Meta(meta)
+  if not meta["py-exercise"] then return meta end
+  local cfg = meta["py-exercise"]
+  globalForbiddenImports  = metaToList(cfg["forbidden-imports"])
+  globalForbiddenKeywords = metaToList(cfg["forbidden-keywords"])
+  return meta
+end
+
+----
+-- Phase 2 – CodeBlock: transform {py-exercise} code blocks.
 ----
 function CodeBlock(el)
   -- Only produce output for HTML
@@ -98,7 +181,6 @@ function CodeBlock(el)
   end
 
   -- Only handle blocks tagged with {py-exercise}
-  -- Quarto stores the engine/language class with surrounding braces, e.g. "{py-exercise}"
   if not el.attr.classes:includes("{py-exercise}") then
     return el
   end
@@ -114,13 +196,23 @@ function CodeBlock(el)
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
 
+  -- Per-cell forbidden lists (extend / override the global lists)
+  local cellForbiddenImports  = splitCommaList(opts["forbidden-imports"])
+  local cellForbiddenKeywords = splitCommaList(opts["forbidden-keywords"])
+
+  -- Merge: global defaults + per-cell additions (cell may add more items)
+  local forbiddenImports  = mergeLists(globalForbiddenImports,  cellForbiddenImports)
+  local forbiddenKeywords = mergeLists(globalForbiddenKeywords, cellForbiddenKeywords)
+
   -- Build the data payload that the JS will consume
   local exerciseData = {
-    id      = exerciseCounter,
-    starter = starter,
-    tests   = tests,
-    label   = opts["label"]   or divId,
-    caption = opts["caption"] or nil,
+    id               = exerciseCounter,
+    starter          = starter,
+    tests            = tests,
+    label            = opts["label"]   or divId,
+    caption          = opts["caption"] or nil,
+    forbiddenImports = forbiddenImports,
+    forbiddenKeywords = forbiddenKeywords,
   }
 
   -- JSON-encode the payload (quarto.json.encode handles all escaping)
@@ -143,5 +235,6 @@ function CodeBlock(el)
 end
 
 return {
-  { CodeBlock = CodeBlock }
+  { Meta = Meta },
+  { CodeBlock = CodeBlock },
 }
