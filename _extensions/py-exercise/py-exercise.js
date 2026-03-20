@@ -340,6 +340,11 @@
     var label             = exerciseData.label;
     var showHints         = exerciseData.showTestHints !== false;
 
+    // localStorage key scoped to this page + label
+    var storageKey = 'pyex|' + window.location.pathname + '|' + label;
+    var savedCode = null;
+    try { savedCode = localStorage.getItem(storageKey); } catch (e) {}
+
     // Monaco editor container
     var editorContainer = document.createElement('div');
     editorContainer.className = 'py-exercise-editor';
@@ -372,7 +377,7 @@
     var editor;
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(editorContainer, {
-        value: starterCode,
+        value: savedCode !== null ? savedCode : starterCode,
         language: 'python',
         theme: 'vs-light',
         automaticLayout: true,
@@ -393,6 +398,15 @@
       };
       editor.onDidContentSizeChange(updateHeight);
       updateHeight();
+
+      // Persist code across reloads
+      var saveTimer;
+      editor.onDidChangeModelContent(function () {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () {
+          try { localStorage.setItem(storageKey, editor.getValue()); } catch (e) {}
+        }, 500);
+      });
 
       editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck);
     });
@@ -441,6 +455,7 @@
     checkBtn.onclick = runCheck;
     resetBtn.onclick = function () {
       if (editor) editor.setValue(starterCode);
+      try { localStorage.removeItem(storageKey); } catch (e) {}
       resultArea.innerHTML = '';
     };
   }
