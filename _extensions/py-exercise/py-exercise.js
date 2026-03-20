@@ -32,6 +32,10 @@
   // Updated after every successful check run.
   var exerciseResults = {};
 
+  // Map of exercise label → Monaco editor instance.
+  // Populated in setupExercise; used by downloadAll() to capture current code.
+  var exerciseEditors = {};
+
   // ---------------------------------------------------------------------------
   // Python: AST-based violation checker
   // ---------------------------------------------------------------------------
@@ -294,6 +298,9 @@
         hideCursorInOverviewRuler: true,
       });
 
+      // Store reference so downloadAll() can read the current code later
+      exerciseEditors[label] = editor;
+
       var updateHeight = function () {
         var h = Math.max(80, editor.getContentHeight());
         editorContainer.style.height = h + 'px';
@@ -500,6 +507,80 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Download (personal documentation)
+  // ---------------------------------------------------------------------------
+
+  function downloadAll() {
+    var exercises = (window.__pyExercises || []).map(function (ex) {
+      var editor = exerciseEditors[ex.label];
+      var result = exerciseResults[ex.label] || null;
+      return {
+        label:   ex.label,
+        caption: ex.caption || null,
+        code:    editor ? editor.getValue() : ex.starter,
+        result:  result,
+      };
+    });
+
+    var data = {
+      exported_at: new Date().toISOString(),
+      exercises:   exercises,
+    };
+
+    var json = JSON.stringify(data, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'aufgaben-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function buildDownloadSection() {
+    var wrap = document.createElement('div');
+    wrap.className = 'py-download-section';
+
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-outline-secondary py-download-btn';
+    btn.innerHTML = '<i class="fa-solid fa-download"></i> Als JSON herunterladen';
+    btn.type = 'button';
+    btn.title = 'Aktuellen Code und Testergebnisse aller Aufgaben speichern';
+    btn.onclick = downloadAll;
+
+    var hint = document.createElement('span');
+    hint.className = 'py-download-hint';
+    hint.textContent = 'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.';
+
+    wrap.appendChild(btn);
+    wrap.appendChild(hint);
+    return wrap;
+  }
+
+  function initDownload() {
+    var cells = document.querySelectorAll('.py-exercise-cell');
+    if (cells.length === 0) return;
+
+    // If a submission footer exists, append the download section to it (with separator).
+    // Otherwise create a standalone footer after the last exercise cell.
+    var subFooter = document.querySelector('.py-submission-footer');
+    if (subFooter) {
+      var sep = document.createElement('hr');
+      sep.className = 'py-footer-sep';
+      subFooter.appendChild(sep);
+      subFooter.appendChild(buildDownloadSection());
+    } else {
+      var footer = document.createElement('div');
+      footer.className = 'py-download-footer';
+      footer.appendChild(buildDownloadSection());
+      var lastCell = cells[cells.length - 1];
+      lastCell.parentNode.insertBefore(footer, lastCell.nextSibling);
+    }
+  }
+
   function initSubmission() {
     if (!submissionConfig.submission) return;
 
@@ -524,6 +605,7 @@
       var exercises = window.__pyExercises || [];
       exercises.forEach(setupExercise);
       initSubmission();
+      initDownload();
     });
   });
 
