@@ -1,9 +1,9 @@
 # py-exercise
 
 A Quarto extension for embedding interactive Python exercises with hidden unit tests.
-Students write code in a Monaco editor directly in the browser; clicking **Überprüfen**
-runs their solution against predefined tests and shows per-test pass/fail feedback –
-all without a server.
+Students write code in a Monaco editor directly in the browser; clicking **Check**
+(or pressing **Shift+Enter**) runs their solution against predefined tests and shows
+per-test pass/fail feedback – all without a server.
 
 Built on top of the [coatless-quarto/pyodide](https://github.com/coatless-quarto/pyodide)
 extension, which provides the Pyodide WebAssembly runtime and Monaco editor.
@@ -84,16 +84,16 @@ sees in the editor) above the sentinel line `## TESTS ##`, and the **test assert
 below it. The test code is never shown to students.
 
 ````markdown
-**Aufgabe:** Schreibe eine Funktion `add(a, b)`, die zwei Zahlen addiert.
+**Task:** Write a function `add(a, b)` that returns the sum of two numbers.
 
 ```{py-exercise}
 def add(a, b):
-    # Deine Lösung hier
+    # Your solution here
     pass
 ## TESTS ##
-assert add(1, 2) == 3,   "add(1, 2) sollte 3 ergeben"
-assert add(-1, 1) == 0,  "add(-1, 1) sollte 0 ergeben"
-assert add(0, 0) == 0,   "add(0, 0) sollte 0 ergeben"
+assert add(1, 2) == 3,   "add(1, 2) should return 3"
+assert add(-1, 1) == 0,  "add(-1, 1) should return 0"
+assert add(0, 0) == 0,   "add(0, 0) should return 0"
 ```
 ````
 
@@ -101,29 +101,33 @@ assert add(0, 0) == 0,   "add(0, 0) sollte 0 ergeben"
 
 Options are set with `#|` comments at the top of the code block:
 
-| Option                | Default         | Description                                        |
-|-----------------------|-----------------|----------------------------------------------------|
-| `label`               | `py-exercise-N` | Unique identifier for the exercise cell            |
-| `caption`             | *(none)*        | Short title shown above the editor                 |
-| `forbidden-imports`   | *(none)*        | Comma-separated list of forbidden module names     |
+| Per-cell option       | Default         | Description                                            |
+|-----------------------|-----------------|--------------------------------------------------------|
+| `label`               | `py-exercise-N` | Unique identifier for the exercise cell                |
+| `caption`             | *(none)*        | Short title shown above the editor                     |
+| `forbidden-imports`   | *(none)*        | Comma-separated list of forbidden module names         |
 | `forbidden-keywords`  | *(none)*        | Comma-separated list of forbidden functions / keywords |
 | `show-test-hints`     | `true`          | Set to `false` to hide assertion messages on failed tests |
 
-The following options are **global only** and go in the document YAML front matter under the `py-exercise` key:
+The following options are set in the document YAML front matter under the `py-exercise`
+key and apply globally to every exercise in the document:
 
-| Global option         | Default | Description                                           |
-|-----------------------|---------|-------------------------------------------------------|
-| `lang`                | `en`    | UI language. Supported values: `en`, `de`             |
-| `forbidden-imports`   | *(none)*| Global forbidden imports (merged with per-cell lists) |
-| `forbidden-keywords`  | *(none)*| Global forbidden keywords (merged with per-cell lists)|
-| `show-test-hints`     | `true`  | Global default for hint visibility                    |
-| `submission`          | `false` | Enable submission export mode                         |
-| `submission-key`      | `py-exercise` | Key used for XOR encoding of submissions        |
+| Global option         | Default         | Description                                            |
+|-----------------------|-----------------|--------------------------------------------------------|
+| `lang`                | `en`            | UI language. Supported values: `en`, `de`              |
+| `forbidden-imports`   | *(none)*        | Forbidden imports for every exercise                   |
+| `forbidden-keywords`  | *(none)*        | Forbidden keywords for every exercise                  |
+| `show-test-hints`     | `true`          | Default hint visibility for every exercise             |
+| `submission`          | `false`         | Enable submission export mode                          |
+| `submission-key`      | `py-exercise`   | Key used for XOR encoding of submissions               |
+
+Per-cell `forbidden-imports` and `forbidden-keywords` entries are **merged** with the
+global lists, not replacing them.
 
 ````markdown
 ```{py-exercise}
 #| label: task-fibonacci
-#| caption: Aufgabe – Fibonacci
+#| caption: Task – Fibonacci
 def fib(n):
     pass
 ## TESTS ##
@@ -142,8 +146,6 @@ language keywords. Violations are detected **before** the code is executed (AST-
 analysis) and shown as a yellow warning box – the code is not run at all.
 
 #### Global restrictions (apply to every exercise in the document)
-
-Set them in the document YAML front matter under the `py-exercise` key:
 
 ```yaml
 ---
@@ -164,9 +166,6 @@ py-exercise:
 
 #### Per-exercise restrictions (extend the global lists)
 
-Use `#|` options inside the code block. Per-cell entries are **added** to the global
-list; they do not replace it.
-
 ````markdown
 ```{py-exercise}
 #| forbidden-imports: numpy, pandas
@@ -182,22 +181,126 @@ assert my_sum([1, 2, 3]) == 6
 
 The checker uses Python's `ast` module to inspect the student's code without running it:
 
-| Entry in `forbidden-keywords` | What is blocked |
-|-------------------------------|-----------------|
-| A built-in or function name, e.g. `sorted`, `eval` | Any call `sorted(...)` or `eval(...)` |
-| A method name, e.g. `sort`, `append` | Any method call `.sort()`, `.append()` |
-| `for` | `for` loops (`ast.For`) |
-| `while` | `while` loops (`ast.While`) |
-| `lambda` | Lambda expressions |
-| `class` | Class definitions |
-| `with` | Context managers |
-| `try` | try/except blocks |
-| `raise` | `raise` statements |
-| `global` / `nonlocal` | Global/nonlocal declarations |
-| `yield` | Generator expressions |
+| Entry in `forbidden-keywords`                        | What is blocked                          |
+|------------------------------------------------------|------------------------------------------|
+| A built-in or function name, e.g. `sorted`, `eval`   | Any call `sorted(...)` or `eval(...)`    |
+| A method name, e.g. `sort`, `append`                 | Any method call `.sort()`, `.append()`   |
+| `for`                                                | `for` loops (`ast.For`)                  |
+| `while`                                              | `while` loops (`ast.While`)              |
+| `lambda`                                             | Lambda expressions                       |
+| `class`                                              | Class definitions                        |
+| `with`                                               | Context managers                         |
+| `try`                                                | try/except blocks                        |
+| `raise`                                              | `raise` statements                       |
+| `global` / `nonlocal`                                | Global/nonlocal declarations             |
+| `yield`                                              | Generator expressions                    |
 
 `forbidden-imports` blocks both `import os` and `from os import ...` style imports,
 matching on the top-level module name.
+
+---
+
+### 5. Hiding test hints
+
+By default, when a test fails its assertion message is shown to the student. Setting
+`show-test-hints: false` suppresses the messages so students cannot infer what is being
+tested from the failure output.
+
+```yaml
+# Global (all exercises):
+py-exercise:
+  show-test-hints: false
+```
+
+````markdown
+# Per-cell:
+```{py-exercise}
+#| show-test-hints: false
+def is_palindrome(s):
+    pass
+## TESTS ##
+assert is_palindrome("racecar") == True
+assert is_palindrome("hello")   == False
+```
+````
+
+---
+
+### 6. Submission export (optional)
+
+When enabled, the page gains two input fields (Student ID, Quiz ID) above the first
+exercise and an **Export results** button below the last exercise. Clicking the button
+produces an encoded string that the student copies and submits.
+
+#### Activating submission mode
+
+```yaml
+---
+py-exercise:
+  submission: true
+  submission-key: "my-secret-key-2026"   # choose any string; defaults to "py-exercise"
+---
+```
+
+The encoded string contains:
+
+```json
+{
+  "v": 1,
+  "sid": "<Student-ID>",
+  "qid": "<Quiz-ID>",
+  "ts":  "<ISO timestamp>",
+  "results": [
+    { "label": "task-add",  "passed": 3, "total": 4, "tests": [true, true, true, false] },
+    { "label": "task-sort", "passed": 2, "total": 2, "tests": [true, true] }
+  ]
+}
+```
+
+#### Encoding scheme
+
+`JSON → UTF-8 bytes → XOR with cycling key → Base64`
+
+The scheme is reversible but not immediately obvious. Anyone viewing the page source can
+read the key, so this is intended for discouraging casual tampering, not for
+cryptographic security. Do not use for high-stakes assessments.
+
+#### Decoding submissions (instructor script)
+
+```python
+import json, base64
+
+def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
+    key_bytes = key.encode("utf-8")
+    xored     = base64.b64decode(encoded)
+    raw       = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
+    return json.loads(raw.decode("utf-8"))
+
+# Example
+data = decode_submission("...", key="my-secret-key-2026")
+print(data["sid"], data["results"])
+```
+
+---
+
+### 7. JSON download
+
+A **Download as JSON** button is always shown below the last exercise (inside the
+submission footer when submission mode is active, otherwise in a separate footer).
+Clicking it saves the current editor content and test results of all exercises to a
+local `.json` file for personal documentation — no server is involved.
+
+---
+
+### 8. Persistent code
+
+Editor contents are automatically saved to `localStorage` as the student types
+(debounced, 500 ms). On reload, each exercise restores the last saved code instead of
+the original starter code. The **Reset** button clears the saved value and restores the
+starter code.
+
+Storage keys are scoped to the page path and the exercise label, so exercises on
+different pages do not interfere with each other.
 
 ---
 
@@ -207,8 +310,9 @@ matching on the top-level module name.
 
 The filter runs in two phases:
 
-1. **`Meta` phase** – reads the global `py-exercise.forbidden-imports` and
-   `py-exercise.forbidden-keywords` lists from the document front matter.
+1. **`Meta` phase** – reads all global options from the document front matter
+   (`lang`, `forbidden-imports`, `forbidden-keywords`, `show-test-hints`,
+   `submission`, `submission-key`).
 2. **`CodeBlock` phase** – for each `{py-exercise}` block:
    - Parses `#|` options and strips them from the code.
    - Splits the remaining code on the `## TESTS ##` sentinel into `starter` and `tests`.
@@ -220,9 +324,10 @@ The filter runs in two phases:
 ### JavaScript (`py-exercise.js`)
 
 On `DOMContentLoaded`, the script polls until `mainPyodide` is available, then
-initialises every exercise cell: creates a Monaco editor and wires up the buttons.
+initialises every exercise cell: creates a Monaco editor, restores any saved code from
+`localStorage`, and wires up the buttons.
 
-When **Überprüfen** is clicked (or Shift+Enter is pressed):
+When **Check** is clicked (or Shift+Enter is pressed):
 
 1. All inputs are passed to Python via `mainPyodide.globals.set()` – no string escaping.
 2. **If** forbidden lists are non-empty, an AST-only checker runs first. Any violations
@@ -278,67 +383,11 @@ json.dumps(_results)
 
 ---
 
-### 5. Submission export (optional)
-
-When enabled, the page gains two input fields (Student-ID, Quiz-ID) above the first
-exercise and an **Ergebnis exportieren** button below the last exercise.
-Clicking the button produces an encoded string that the student copies and submits.
-
-#### Activating submission mode
-
-```yaml
----
-py-exercise:
-  submission: true
-  submission-key: "my-secret-key-2026"   # choose any string; defaults to "py-exercise"
----
-```
-
-The encoded string contains:
-
-```json
-{
-  "v": 1,
-  "sid": "<Student-ID>",
-  "qid": "<Quiz-ID>",
-  "ts":  "<ISO timestamp>",
-  "results": [
-    { "label": "task-add",  "passed": 3, "total": 4, "tests": [true, true, true, false] },
-    { "label": "task-sort", "passed": 2, "total": 2, "tests": [true, true] }
-  ]
-}
-```
-
-#### Encoding scheme
-
-`JSON → UTF-8 bytes → XOR with cycling key → Base64`
-
-The scheme is reversible but not immediately obvious. Anyone viewing the page source can
-read the key, so this is intended for discouraging casual tampering, not for
-cryptographic security. Do not use for high-stakes assessments.
-
-#### Decoding submissions (instructor script)
-
-```python
-import json, base64
-
-def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
-    key_bytes   = key.encode("utf-8")
-    xored       = base64.b64decode(encoded)
-    raw         = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
-    return json.loads(raw.decode("utf-8"))
-
-# Example
-data = decode_submission("...", key="my-secret-key-2026")
-print(data["sid"], data["results"])
-```
-
----
-
 ## Writing good tests
 
 - Use plain `assert` statements. Each statement is one test and is reported individually.
-- Always provide an assertion message – it is shown to the student when a test fails.
+- Always provide an assertion message – it is shown to the student when a test fails
+  (unless `show-test-hints: false`).
 - Keep assertion messages student-friendly: describe what the function *should* return,
   not what the test *checks*.
 - Use private variable names (leading `_`) for any helper variables in the test section
@@ -346,12 +395,12 @@ print(data["sid"], data["results"])
 
 ```python
 ## TESTS ##
-assert my_func(1) == 42, "my_func(1) sollte 42 zurückgeben"
+assert my_func(1) == 42, "my_func(1) should return 42"
 
 # Helper variables with _ prefix
 _lst = [1, 2, 3]
 _copy = my_func(_lst)
-assert _lst == [1, 2, 3], "Die Original-Liste darf nicht verändert werden"
+assert _lst == [1, 2, 3], "my_func should not modify the input list"
 ```
 
 ---
@@ -368,7 +417,11 @@ py-exercise:
 
 Supported languages: `en` (English), `de` (German).
 
-To add a new language, open `py-exercise.js` and add a new entry to the `LOCALES` object, copying the structure of the `en` entry. The keys cover all UI strings, including the Python violation/error message templates (which use `{}` as the `str.format()` placeholder). Then add the corresponding noscript message to the `noscriptMessages` table in `py-exercise.lua`.
+To add a new language, open `py-exercise.js` and add a new entry to the `LOCALES`
+object, copying the structure of the `en` entry. The keys cover all UI strings,
+including the Python violation/error message templates (which use `{}` as the
+`str.format()` placeholder). Then add the corresponding noscript message to the
+`noscriptMessages` table in `py-exercise.lua`.
 
 ---
 
@@ -381,3 +434,5 @@ To add a new language, open `py-exercise.js` and add a new entry to the `LOCALES
   single browser session.
 - Heavy packages (numpy, pandas, …) are loaded on first import and may add a few
   seconds on the first run. Subsequent runs are fast.
+- `localStorage` persistence relies on the browser's storage quota and is not
+  available in all private-browsing modes.
