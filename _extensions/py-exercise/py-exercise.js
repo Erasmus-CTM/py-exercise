@@ -2,6 +2,97 @@
   'use strict';
 
   // ---------------------------------------------------------------------------
+  // Locales – add new languages here
+  // ---------------------------------------------------------------------------
+
+  var LOCALES = {
+    en: {
+      btnCheck:             '<i class="fa-solid fa-check"></i> Check',
+      btnCheckTitle:        'Run checks (Shift+Enter)',
+      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Reset',
+      btnResetTitle:        'Restore starter code',
+      running:              '⏳ Checking…',
+      errorHeader:          '❌ Error in code:',
+      unexpectedError:      '❌ Unexpected error:',
+      stdoutLabel:          'Output:',
+      allPassed: function (n) {
+        return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
+      },
+      someFailed: function (p, t) {
+        return '❌ ' + p + ' of ' + t + ' test' + (t === 1 ? '' : 's') + ' passed';
+      },
+      violationsHeader:     '🚫 Not allowed:',
+      // Submission UI
+      submissionTitle:      '📋 Submission',
+      studentIdLabel:       'Student ID',
+      studentIdPlaceholder: 'e.g. s123456',
+      quizIdLabel:          'Quiz ID',
+      quizIdPlaceholder:    'e.g. quiz-01',
+      exportBtn:            '<i class="fa-solid fa-file-export"></i> Export results',
+      outputLabel:          'Copy encoded string and submit:',
+      copyBtn:              '<i class="fa-regular fa-copy"></i> Copy',
+      copyOk:               '<i class="fa-solid fa-check"></i> Copied!',
+      validationError:      'Please fill in Student ID and Quiz ID.',
+      encodingError:        'Error during encoding: ',
+      // Download
+      downloadBtn:          '<i class="fa-solid fa-download"></i> Download as JSON',
+      downloadBtnTitle:     'Save current code and test results for all exercises',
+      downloadHint:         'Saves your code and test results for personal documentation.',
+      downloadFilename:     'exercises-',
+      // Python message templates – use {} as placeholder for str.format()
+      msgForbiddenImport:   "Forbidden import: '{}'",
+      msgForbiddenFunction: "Forbidden function: '{}'",
+      msgForbiddenMethod:   "Forbidden method: '.{}'",
+      msgForbiddenKeyword:  "Forbidden keyword: '{}'",
+      msgAssertionFailed:   'Assertion failed',
+      msgTestError:         'Error: {}',
+      msgSyntaxError:       'Syntax error in tests: {}',
+    },
+    de: {
+      btnCheck:             '<i class="fa-solid fa-check"></i> Überprüfen',
+      btnCheckTitle:        'Code prüfen (Shift+Enter)',
+      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Zurücksetzen',
+      btnResetTitle:        'Starter-Code wiederherstellen',
+      running:              '⏳ Überprüfe…',
+      errorHeader:          '❌ Fehler im Code:',
+      unexpectedError:      '❌ Unerwarteter Fehler:',
+      stdoutLabel:          'Ausgabe:',
+      allPassed: function (n) {
+        return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
+      },
+      someFailed: function (p, t) {
+        return '❌ ' + p + ' von ' + t + ' Test' + (t === 1 ? '' : 's') + ' bestanden';
+      },
+      violationsHeader:     '🚫 Nicht erlaubt:',
+      // Submission UI
+      submissionTitle:      '📋 Abgabe',
+      studentIdLabel:       'Student-ID',
+      studentIdPlaceholder: 'z.B. s123456',
+      quizIdLabel:          'Quiz-ID',
+      quizIdPlaceholder:    'z.B. quiz-01',
+      exportBtn:            '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren',
+      outputLabel:          'Kodierten String kopieren und abgeben:',
+      copyBtn:              '<i class="fa-regular fa-copy"></i> Kopieren',
+      copyOk:               '<i class="fa-solid fa-check"></i> Kopiert!',
+      validationError:      'Bitte Student-ID und Quiz-ID ausfüllen.',
+      encodingError:        'Fehler beim Kodieren: ',
+      // Download
+      downloadBtn:          '<i class="fa-solid fa-download"></i> Als JSON herunterladen',
+      downloadBtnTitle:     'Aktuellen Code und Testergebnisse aller Aufgaben speichern',
+      downloadHint:         'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.',
+      downloadFilename:     'aufgaben-',
+      // Python message templates
+      msgForbiddenImport:   "Verbotener Import: '{}'",
+      msgForbiddenFunction: "Verbotene Funktion: '{}'",
+      msgForbiddenMethod:   "Verbotene Methode: '.{}'",
+      msgForbiddenKeyword:  "Verbotenes Schlüsselwort: '{}'",
+      msgAssertionFailed:   'Assertion fehlgeschlagen',
+      msgTestError:         'Fehler: {}',
+      msgSyntaxError:       'Syntaxfehler in Tests: {}',
+    },
+  };
+
+  // ---------------------------------------------------------------------------
   // Utilities
   // ---------------------------------------------------------------------------
 
@@ -22,18 +113,16 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Submission state
+  // Submission state + locale
   // ---------------------------------------------------------------------------
 
-  // Filled in from window.__pyExerciseConfig (injected by Lua filter)
-  var submissionConfig = (window.__pyExerciseConfig) || { submission: false, submissionKey: 'py-exercise' };
+  var submissionConfig = (window.__pyExerciseConfig) || { submission: false, submissionKey: 'py-exercise', lang: 'en' };
+  var L = LOCALES[submissionConfig.lang] || LOCALES['en'];
 
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
-  // Updated after every successful check run.
   var exerciseResults = {};
 
-  // Map of exercise label → Monaco editor instance.
-  // Populated in setupExercise; used by downloadAll() to capture current code.
+  // Map of exercise label → Monaco editor instance
   var exerciseEditors = {};
 
   // ---------------------------------------------------------------------------
@@ -75,23 +164,23 @@
     '            for _a in _node.names:',
     '                _top = _a.name.split(".")[0]',
     '                if _top in _fi:',
-    '                    _add(f"Verbotener Import: \'{_top}\'")',
+    '                    _add(_msg_forbidden_import.format(_top))',
     '        elif isinstance(_node, _ast.ImportFrom):',
     '            if _node.module:',
     '                _top = _node.module.split(".")[0]',
     '                if _top in _fi:',
-    '                    _add(f"Verbotener Import: \'{_top}\'")',
+    '                    _add(_msg_forbidden_import.format(_top))',
     '        elif isinstance(_node, _ast.Call):',
     '            if isinstance(_node.func, _ast.Name):',
     '                if _node.func.id in _fk:',
-    '                    _add(f"Verbotene Funktion: \'{_node.func.id}\'")',
+    '                    _add(_msg_forbidden_function.format(_node.func.id))',
     '            elif isinstance(_node.func, _ast.Attribute):',
     '                if _node.func.attr in _fk:',
-    '                    _add(f"Verbotene Methode: \'.{_node.func.attr}\'")',
+    '                    _add(_msg_forbidden_method.format(_node.func.attr))',
     '        else:',
     '            for _kw, _nt in _KW_NODES.items():',
     '                if _kw in _fk and isinstance(_node, _nt):',
-    '                    _add(f"Verbotenes Schlüsselwort: \'{_kw}\'")',
+    '                    _add(_msg_forbidden_keyword.format(_kw))',
     'except SyntaxError:',
     '    pass',
     '',
@@ -133,12 +222,12 @@
     '            except AssertionError as e:',
     '                _results["tests"].append({',
     '                    "passed": False,',
-    '                    "message": str(e) if str(e) else "Assertion fehlgeschlagen"',
+    '                    "message": str(e) if str(e) else _msg_assertion_failed',
     '                })',
     '            except Exception as e:',
-    '                _results["tests"].append({"passed": False, "message": f"Fehler: {e}"})',
+    '                _results["tests"].append({"passed": False, "message": _msg_test_error.format(e)})',
     '    except SyntaxError as e:',
-    '        _results["student_error"] = f"Syntaxfehler in Tests: {e}"',
+    '        _results["student_error"] = _msg_syntax_error.format(e)',
     '',
     'json.dumps(_results)',
   ].join('\n');
@@ -147,7 +236,6 @@
   // Python: submission encoder
   // ---------------------------------------------------------------------------
   // Encoding: JSON → UTF-8 bytes → XOR with cycling key → Base64.
-  // Decoding requires knowing both the key and the procedure.
   var ENCODER_PY = [
     'import json as _json, base64 as _b64',
     '',
@@ -167,7 +255,7 @@
     }).join('');
     area.innerHTML =
       '<div class="py-exercise-violations">' +
-      '<strong>🚫 Nicht erlaubt:</strong>' +
+      '<strong>' + L.violationsHeader + '</strong>' +
       '<ul class="py-exercise-violation-list">' + items + '</ul>' +
       '</div>';
   }
@@ -178,7 +266,7 @@
     if (data.student_error) {
       area.innerHTML =
         '<div class="py-exercise-error">' +
-        '<strong>❌ Fehler im Code:</strong>' +
+        '<strong>' + L.errorHeader + '</strong>' +
         '<pre>' + escapeHtml(data.student_error) + '</pre>' +
         '</div>';
       return;
@@ -187,7 +275,7 @@
     if (data.stdout && data.stdout.trim()) {
       html +=
         '<div class="py-exercise-stdout">' +
-        '<span class="py-exercise-stdout-label">Ausgabe:</span>' +
+        '<span class="py-exercise-stdout-label">' + L.stdoutLabel + '</span>' +
         '<pre>' + escapeHtml(data.stdout) + '</pre>' +
         '</div>';
     }
@@ -209,13 +297,9 @@
 
     html += '<div class="py-exercise-summary">';
     if (allPass) {
-      html +=
-        '<div class="py-exercise-all-passed">✅ Alle ' + total +
-        ' Test' + (total === 1 ? '' : 's') + ' bestanden!</div>';
+      html += '<div class="py-exercise-all-passed">' + L.allPassed(total) + '</div>';
     } else {
-      html +=
-        '<div class="py-exercise-some-failed">❌ ' + passed + ' von ' + total +
-        ' Test' + (total === 1 ? '' : 's') + ' bestanden</div>';
+      html += '<div class="py-exercise-some-failed">' + L.someFailed(passed, total) + '</div>';
     }
 
     if (total > 1) {
@@ -267,15 +351,15 @@
 
     var checkBtn = document.createElement('button');
     checkBtn.className = 'btn btn-primary py-exercise-check';
-    checkBtn.innerHTML = '<i class="fa-solid fa-check"></i> Überprüfen';
+    checkBtn.innerHTML = L.btnCheck;
     checkBtn.type = 'button';
-    checkBtn.title = 'Code prüfen (Shift+Enter)';
+    checkBtn.title = L.btnCheckTitle;
 
     var resetBtn = document.createElement('button');
     resetBtn.className = 'btn btn-light py-exercise-reset';
-    resetBtn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Zurücksetzen';
+    resetBtn.innerHTML = L.btnReset;
     resetBtn.type = 'button';
-    resetBtn.title = 'Starter-Code wiederherstellen';
+    resetBtn.title = L.btnResetTitle;
 
     buttonBar.appendChild(checkBtn);
     buttonBar.appendChild(resetBtn);
@@ -316,7 +400,7 @@
     async function runCheck() {
       if (!editor) return;
 
-      resultArea.innerHTML = '<div class="py-exercise-running">⏳ Überprüfe…</div>';
+      resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
       checkBtn.disabled = true;
       resetBtn.disabled = true;
 
@@ -345,7 +429,7 @@
       } catch (err) {
         resultArea.innerHTML =
           '<div class="py-exercise-error">' +
-          '<strong>❌ Unerwarteter Fehler:</strong>' +
+          '<strong>' + L.unexpectedError + '</strong>' +
           '<pre>' + escapeHtml(String(err)) + '</pre>' +
           '</div>';
       } finally {
@@ -370,17 +454,17 @@
     wrap.className = 'py-submission-header';
     wrap.innerHTML =
       '<div class="py-submission-header-inner">' +
-        '<h5 class="py-submission-title">📋 Abgabe</h5>' +
+        '<h5 class="py-submission-title">' + L.submissionTitle + '</h5>' +
         '<div class="py-submission-fields">' +
           '<div class="py-submission-field">' +
-            '<label for="py-submission-student-id">Student-ID</label>' +
+            '<label for="py-submission-student-id">' + L.studentIdLabel + '</label>' +
             '<input type="text" id="py-submission-student-id" ' +
-                   'placeholder="z.B. s123456" autocomplete="off">' +
+                   'placeholder="' + escapeHtml(L.studentIdPlaceholder) + '" autocomplete="off">' +
           '</div>' +
           '<div class="py-submission-field">' +
-            '<label for="py-submission-quiz-id">Quiz-ID</label>' +
+            '<label for="py-submission-quiz-id">' + L.quizIdLabel + '</label>' +
             '<input type="text" id="py-submission-quiz-id" ' +
-                   'placeholder="z.B. quiz-01" autocomplete="off">' +
+                   'placeholder="' + escapeHtml(L.quizIdPlaceholder) + '" autocomplete="off">' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -393,7 +477,7 @@
 
     var btn = document.createElement('button');
     btn.className = 'btn btn-success py-submission-export-btn';
-    btn.innerHTML = '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren';
+    btn.innerHTML = L.exportBtn;
     btn.type = 'button';
     btn.onclick = exportResults;
 
@@ -411,21 +495,21 @@
 
     var outLabel = document.createElement('span');
     outLabel.className = 'py-submission-output-label';
-    outLabel.textContent = 'Kodierten String kopieren und abgeben:';
+    outLabel.textContent = L.outputLabel;
 
     var copyBtn = document.createElement('button');
     copyBtn.className = 'btn btn-light btn-sm py-submission-copy-btn';
     copyBtn.id = 'py-submission-copy-btn';
     copyBtn.type = 'button';
-    copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Kopieren';
+    copyBtn.innerHTML = L.copyBtn;
     copyBtn.onclick = function () {
       var text = (document.getElementById('py-submission-output') || {}).value || '';
       if (!text) return;
       navigator.clipboard.writeText(text).then(function () {
-        copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Kopiert!';
+        copyBtn.innerHTML = L.copyOk;
         copyBtn.classList.add('py-submission-copy-ok');
         setTimeout(function () {
-          copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i> Kopieren';
+          copyBtn.innerHTML = L.copyBtn;
           copyBtn.classList.remove('py-submission-copy-ok');
         }, 2000);
       });
@@ -464,7 +548,7 @@
     if (!studentId || !quizId) {
       if (msgEl) {
         msgEl.innerHTML =
-          '<div class="py-submission-error">Bitte Student-ID und Quiz-ID ausfüllen.</div>';
+          '<div class="py-submission-error">' + escapeHtml(L.validationError) + '</div>';
       }
       if (outWrap) outWrap.style.display = 'none';
       return;
@@ -502,8 +586,9 @@
     } catch (err) {
       if (msgEl) {
         msgEl.innerHTML =
-          '<div class="py-submission-error">Fehler beim Kodieren: ' +
-          escapeHtml(String(err)) + '</div>';
+          '<div class="py-submission-error">' +
+          escapeHtml(L.encodingError) + escapeHtml(String(err)) +
+          '</div>';
       }
     }
   }
@@ -534,7 +619,7 @@
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
     a.href     = url;
-    a.download = 'aufgaben-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.download = L.downloadFilename + new Date().toISOString().slice(0, 10) + '.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -547,14 +632,14 @@
 
     var btn = document.createElement('button');
     btn.className = 'btn btn-outline-secondary py-download-btn';
-    btn.innerHTML = '<i class="fa-solid fa-download"></i> Als JSON herunterladen';
+    btn.innerHTML = L.downloadBtn;
     btn.type = 'button';
-    btn.title = 'Aktuellen Code und Testergebnisse aller Aufgaben speichern';
+    btn.title = L.downloadBtnTitle;
     btn.onclick = downloadAll;
 
     var hint = document.createElement('span');
     hint.className = 'py-download-hint';
-    hint.textContent = 'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.';
+    hint.textContent = L.downloadHint;
 
     wrap.appendChild(btn);
     wrap.appendChild(hint);
@@ -603,6 +688,15 @@
   // ---------------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', function () {
     waitForReady(function () {
+      // Set Python message globals once – used by CHECKER_PY and RUNNER_PY
+      mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
+      mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
+      mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
+      mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
+      mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
+      mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
+      mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
+
       var exercises = window.__pyExercises || [];
       exercises.forEach(setupExercise);
       initSubmission();

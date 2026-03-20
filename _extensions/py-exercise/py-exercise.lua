@@ -45,6 +45,15 @@ local submissionKey     = "py-exercise"
 -- Whether failed tests reveal their assertion message (default: true)
 local globalShowTestHints = true
 
+-- Language / locale (default: English)
+local lang = "en"
+
+-- Noscript messages per locale
+local noscriptMessages = {
+  en = "Please enable JavaScript to load the interactive exercise.",
+  de = "Bitte JavaScript aktivieren, um die interaktive Aufgabe zu laden.",
+}
+
 ----
 -- Helper: read a file that lives next to this .lua filter
 ----
@@ -126,6 +135,7 @@ local function ensureExerciseSetup()
   local config = {
     submission    = submissionEnabled,
     submissionKey = submissionKey,
+    lang          = lang,
   }
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
@@ -155,6 +165,9 @@ function Meta(meta)
 
   if cfg["show-test-hints"] then
     globalShowTestHints = not (pandoc.utils.stringify(cfg["show-test-hints"]) == "false")
+  end
+  if cfg["lang"] then
+    lang = pandoc.utils.stringify(cfg["lang"])
   end
 
   return meta
@@ -199,10 +212,11 @@ function CodeBlock(el)
 
   local dataJson = quarto.json.encode(exerciseData)
 
+  local noscriptMsg = noscriptMessages[lang] or noscriptMessages["en"]
   local html = table.concat({
     '<div class="py-exercise-cell" id="' .. divId .. '">',
     '  <noscript>',
-    '    Bitte JavaScript aktivieren, um die interaktive Aufgabe zu laden.',
+    '    ' .. noscriptMsg,
     '  </noscript>',
     '</div>',
     '<script>',

@@ -109,6 +109,17 @@ Options are set with `#|` comments at the top of the code block:
 | `forbidden-keywords`  | *(none)*        | Comma-separated list of forbidden functions / keywords |
 | `show-test-hints`     | `true`          | Set to `false` to hide assertion messages on failed tests |
 
+The following options are **global only** and go in the document YAML front matter under the `py-exercise` key:
+
+| Global option         | Default | Description                                           |
+|-----------------------|---------|-------------------------------------------------------|
+| `lang`                | `en`    | UI language. Supported values: `en`, `de`             |
+| `forbidden-imports`   | *(none)*| Global forbidden imports (merged with per-cell lists) |
+| `forbidden-keywords`  | *(none)*| Global forbidden keywords (merged with per-cell lists)|
+| `show-test-hints`     | `true`  | Global default for hint visibility                    |
+| `submission`          | `false` | Enable submission export mode                         |
+| `submission-key`      | `py-exercise` | Key used for XOR encoding of submissions        |
+
 ````markdown
 ```{py-exercise}
 #| label: task-fibonacci
@@ -342,6 +353,22 @@ _lst = [1, 2, 3]
 _copy = my_func(_lst)
 assert _lst == [1, 2, 3], "Die Original-Liste darf nicht verändert werden"
 ```
+
+---
+
+## Localization
+
+Set the UI language in the document front matter:
+
+```yaml
+py-exercise:
+  lang: en   # default
+  # lang: de
+```
+
+Supported languages: `en` (English), `de` (German).
+
+To add a new language, open `py-exercise.js` and add a new entry to the `LOCALES` object, copying the structure of the `en` entry. The keys cover all UI strings, including the Python violation/error message templates (which use `{}` as the `str.format()` placeholder). Then add the corresponding noscript message to the `noscriptMessages` table in `py-exercise.lua`.
 
 ---
 

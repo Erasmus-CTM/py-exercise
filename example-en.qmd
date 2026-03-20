@@ -1,0 +1,201 @@
+---
+title: "py-exercise – Feature Overview"
+subtitle: "One example per feature of the interactive Python exercise extension"
+filters:
+  - coatless-quarto/pyodide
+  - py-exercise
+py-exercise:
+  lang: en
+  submission: true
+  submission-key: "demo-key-2026"
+  forbidden-imports:
+    - os
+    - sys
+    - subprocess
+  show-test-hints: true
+---
+
+This document walks through every feature of the `py-exercise` extension.
+Write your solution in the editor and press **Check** (or **Shift+Enter**) to
+run the hidden unit tests.
+
+```{pyodide-python}
+#| context: setup
+# Initialises Pyodide and Monaco – required for py-exercise cells.
+```
+
+---
+
+## 1 – Basic exercise
+
+The simplest exercise: a `label` to identify it, starter code, and hidden
+`assert` statements below `## TESTS ##`. Each assertion is one test and is
+reported individually.
+
+**Task:** Write a function `add(a, b)` that returns the sum of two numbers.
+
+```{py-exercise}
+#| label: add
+def add(a, b):
+    pass
+## TESTS ##
+assert add(1, 2)  == 3,  "add(1, 2) should return 3"
+assert add(0, 0)  == 0,  "add(0, 0) should return 0"
+assert add(-1, 1) == 0,  "add(-1, 1) should return 0"
+```
+
+---
+
+## 2 – Caption
+
+Use `#| caption:` to show a short title above the editor. Useful when you
+embed exercises inside a longer document and want to label them clearly.
+
+```{py-exercise}
+#| label: square
+#| caption: Task – Square a number
+def square(n):
+    pass
+## TESTS ##
+assert square(3)  == 9,  "square(3) should return 9"
+assert square(0)  == 0,  "square(0) should return 0"
+assert square(-4) == 16, "square(-4) should return 16"
+```
+
+---
+
+## 3 – Capturing print() output
+
+`print()` calls in the student's code are captured and shown below the editor,
+independently of the test results.
+
+**Task:** Write a function `greet(name)` that **prints** `"Hello, <name>!"`
+and also **returns** that string.
+
+```{py-exercise}
+#| label: greet
+def greet(name):
+    pass
+## TESTS ##
+assert greet("World") == "Hello, World!", "greet('World') should return 'Hello, World!'"
+assert greet("Alice") == "Hello, Alice!", "greet('Alice') should return 'Hello, Alice!'"
+```
+
+---
+
+## 4 – Forbidden imports (per-cell)
+
+`#| forbidden-imports:` blocks specific module names (both `import x` and
+`from x import …` forms). The check runs on the AST — the code is never
+executed if a violation is found.
+
+> The global front matter of this document already forbids `os`, `sys`, and
+> `subprocess` for every exercise. The cell below additionally forbids `math`.
+
+**Task:** Write a function `circle_area(r)` that returns the area of a circle
+with radius `r`. Use `3.14159` instead of `math.pi`.
+
+```{py-exercise}
+#| label: circle-area
+#| forbidden-imports: math
+def circle_area(r):
+    pass
+## TESTS ##
+import math as _math
+assert abs(circle_area(1) - _math.pi) < 0.001, "circle_area(1) should be ≈ π"
+assert abs(circle_area(2) - 4 * _math.pi) < 0.001, "circle_area(2) should be ≈ 4π"
+assert circle_area(0) == 0, "circle_area(0) should be 0"
+```
+
+---
+
+## 5 – Forbidden keywords (per-cell)
+
+`#| forbidden-keywords:` blocks built-in functions, method names, or language
+keywords (`for`, `while`, `lambda`, `class`, `with`, `try`, `raise`, …).
+
+**Task:** Write a function `my_sum(lst)` that returns the sum of all elements
+in a list. The built-in `sum()` is **not allowed**.
+
+```{py-exercise}
+#| label: my-sum
+#| forbidden-keywords: sum
+def my_sum(lst):
+    pass
+## TESTS ##
+assert my_sum([1, 2, 3]) == 6, "my_sum([1, 2, 3]) should return 6"
+assert my_sum([])        == 0, "my_sum([]) should return 0"
+assert my_sum([-1, 1])   == 0, "my_sum([-1, 1]) should return 0"
+```
+
+---
+
+**Task:** Write a recursive function `factorial(n)`. Loops (`for`, `while`)
+are not allowed — the solution must be recursive.
+
+```{py-exercise}
+#| label: factorial
+#| forbidden-keywords: for, while
+def factorial(n):
+    pass
+## TESTS ##
+assert factorial(0) == 1,   "factorial(0) should return 1"
+assert factorial(1) == 1,   "factorial(1) should return 1"
+assert factorial(5) == 120, "factorial(5) should return 120"
+```
+
+---
+
+## 6 – Hidden test hints (`show-test-hints: false`)
+
+By default, the assertion message is shown when a test fails. Setting
+`#| show-test-hints: false` hides those messages so students cannot infer
+what is being tested.
+
+**Task:** Write a function `is_palindrome(s)` that returns `True` if the
+string is a palindrome (ignoring case), `False` otherwise.
+
+```{py-exercise}
+#| label: palindrome
+#| show-test-hints: false
+def is_palindrome(s):
+    pass
+## TESTS ##
+assert is_palindrome("racecar") == True,  "racecar is a palindrome"
+assert is_palindrome("hello")   == False, "hello is not a palindrome"
+assert is_palindrome("Madam")   == True,  "Madam is a palindrome (case-insensitive)"
+assert is_palindrome("")        == True,  "empty string is a palindrome"
+```
+
+---
+
+## 7 – Submission export
+
+The submission header above and the **Export results** button below are
+enabled by setting `submission: true` in the document front matter. Students
+enter their Student ID and Quiz ID, then click the button to get an encoded
+string to submit.
+
+The encoded string can be decoded by the instructor with:
+
+```python
+import json, base64
+
+def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
+    key_bytes = key.encode("utf-8")
+    xored     = base64.b64decode(encoded)
+    raw       = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
+    return json.loads(raw.decode("utf-8"))
+
+data = decode_submission("...", key="demo-key-2026")
+print(data["sid"], data["results"])
+```
+
+## 8 – JSON download
+
+The **Download as JSON** button (in the footer below) saves the current editor
+content and test results of every exercise to a local file — for personal
+documentation. No server is involved.
+
+The download is always available, regardless of whether submission mode is
+enabled.
