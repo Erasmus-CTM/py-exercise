@@ -147,6 +147,48 @@ local function ensureExerciseSetup()
 end
 
 ----
+-- Helper: recursively scan a block list for {py-exercise} and {pyodide-python} classes.
+-- Returns: hasPyExercise (bool), hasPyodide (bool)
+----
+local function findClasses(blocks)
+  local hasPyExercise = false
+  local hasPyodide    = false
+  for _, block in ipairs(blocks) do
+    if block.t == "CodeBlock" then
+      if block.attr.classes:includes("{py-exercise}")    then hasPyExercise = true end
+      if block.attr.classes:includes("{pyodide-python}") then hasPyodide    = true end
+    elseif block.t == "Div" and block.content then
+      local sub_ex, sub_py = findClasses(block.content)
+      if sub_ex then hasPyExercise = true end
+      if sub_py then hasPyodide    = true end
+    end
+    if hasPyExercise and hasPyodide then break end
+  end
+  return hasPyExercise, hasPyodide
+end
+
+----
+-- Phase 0 – Pandoc: if the document contains {py-exercise} blocks but no
+-- {pyodide-python} block, prepend a hidden setup cell so that the pyodide
+-- filter (which runs after this one) initialises the runtime automatically.
+-- Users do not need to add the setup cell manually.
+----
+function Pandoc(doc)
+  if not quarto.doc.is_format("html") then return doc end
+
+  local hasPyExercise, hasPyodide = findClasses(doc.blocks)
+
+  if hasPyExercise and not hasPyodide then
+    local setupBlock = pandoc.CodeBlock(
+      "#| context: setup\n# Initialised automatically by py-exercise",
+      pandoc.Attr("", {"{pyodide-python}"})
+    )
+    table.insert(doc.blocks, 1, setupBlock)
+    return doc
+  end
+end
+
+----
 -- Phase 1 – Meta: read global options from document YAML front matter.
 ----
 function Meta(meta)
@@ -254,6 +296,7 @@ function splitCode(code)
 end
 
 return {
+  { Pandoc = Pandoc },
   { Meta = Meta },
   { CodeBlock = CodeBlock },
 }

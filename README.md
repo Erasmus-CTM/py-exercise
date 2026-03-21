@@ -42,28 +42,17 @@ your-project/
 
 ### 1. Activate both filters
 
-> **Important:** The `coatless-quarto/pyodide` extension only injects the Pyodide
-> runtime and Monaco editor when it finds at least one `{pyodide-python}` block in the
-> document. If your document contains only `{py-exercise}` blocks and no regular
-> `{pyodide-python}` blocks, add a hidden setup cell near the top of the document:
->
-> ````markdown
-> ```{pyodide-python}
-> #| context: setup
-> # Initialises Pyodide and Monaco – required for py-exercise cells.
-> ```
-> ````
-
 In each document that contains exercises, declare both extensions in the YAML
-front matter. **Order matters:** `coatless-quarto/pyodide` must come first so that
-the Pyodide runtime and Monaco editor are loaded before `py-exercise` attaches to them.
+front matter. **Order matters:** `py-exercise` must come first so that it can
+inject the Pyodide initialisation cell before `coatless-quarto/pyodide` processes
+the document.
 
 ```yaml
 ---
 title: "My Exercises"
 filters:
-  - coatless-quarto/pyodide
   - py-exercise
+  - coatless-quarto/pyodide
 ---
 ```
 
@@ -73,9 +62,13 @@ Alternatively, activate them for an entire project in `_quarto.yml`:
 format:
   html:
     filters:
-      - coatless-quarto/pyodide
       - py-exercise
+      - coatless-quarto/pyodide
 ```
+
+> **Note:** The `py-exercise` filter automatically injects the hidden Pyodide
+> initialisation cell that the `coatless-quarto/pyodide` extension needs. You do
+> not need to add a `{pyodide-python}` setup block to your document manually.
 
 ### 2. Write exercises
 
