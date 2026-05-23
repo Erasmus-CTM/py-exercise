@@ -426,11 +426,17 @@ including the Python violation/error message templates (which use `{}` as the
 
 ---
 
+## Testing
+
+- There is a tiny browser based (playwright) test. see `run-test.sh`.
+
 ## Authors
 
 - Michael Kallweit
 
 ---
+
+
 
 ## License
 

@@ -1,0 +1,12 @@
+# other extensions unless we want to vendor them
+_extensions/
+!_extensions/py-exercise
+
+# Quarto generated
+*_files/
+*.quarto_ipynb*
+*.html
+
+# javascript things
+node_modules/
+test-results/
