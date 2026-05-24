@@ -5,5 +5,4 @@ quarto render example-mini.qmd
 
 
 echo "> run playwright test (can take minutes...)"
-
 npx playwright test
