@@ -7,88 +7,88 @@
 
   var LOCALES = {
     en: {
-      btnCheck:             '<i class="fa-solid fa-check"></i> Check',
-      btnCheckTitle:        'Run checks (Shift+Enter)',
-      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Reset',
-      btnResetTitle:        'Restore starter code',
-      running:              '⏳ Checking…',
-      errorHeader:          '❌ Error in code:',
-      unexpectedError:      '❌ Unexpected error:',
-      stdoutLabel:          'Output:',
+      btnCheck: '<i class="fa-solid fa-check"></i> Check',
+      btnCheckTitle: 'Run checks (Shift+Enter)',
+      btnReset: '<i class="fa-solid fa-arrows-rotate"></i> Reset',
+      btnResetTitle: 'Restore starter code',
+      running: '⏳ Checking…',
+      errorHeader: '❌ Error in code:',
+      unexpectedError: '❌ Unexpected error:',
+      stdoutLabel: 'Output:',
       allPassed: function (n) {
         return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
       },
       someFailed: function (p, t) {
         return '❌ ' + p + ' of ' + t + ' test' + (t === 1 ? '' : 's') + ' passed';
       },
-      violationsHeader:     '🚫 Not allowed:',
+      violationsHeader: '🚫 Not allowed:',
       // Submission UI
-      submissionTitle:      '📋 Submission',
-      studentIdLabel:       'Student ID',
+      submissionTitle: '📋 Submission',
+      studentIdLabel: 'Student ID',
       studentIdPlaceholder: 'e.g. s123456',
-      quizIdLabel:          'Quiz ID',
-      quizIdPlaceholder:    'e.g. quiz-01',
-      exportBtn:            '<i class="fa-solid fa-file-export"></i> Export results',
-      outputLabel:          'Copy encoded string and submit:',
-      copyBtn:              '<i class="fa-regular fa-copy"></i> Copy',
-      copyOk:               '<i class="fa-solid fa-check"></i> Copied!',
-      validationError:      'Please fill in Student ID and Quiz ID.',
-      encodingError:        'Error during encoding: ',
+      quizIdLabel: 'Quiz ID',
+      quizIdPlaceholder: 'e.g. quiz-01',
+      exportBtn: '<i class="fa-solid fa-file-export"></i> Export results',
+      outputLabel: 'Copy encoded string and submit:',
+      copyBtn: '<i class="fa-regular fa-copy"></i> Copy',
+      copyOk: '<i class="fa-solid fa-check"></i> Copied!',
+      validationError: 'Please fill in Student ID and Quiz ID.',
+      encodingError: 'Error during encoding: ',
       // Download
-      downloadBtn:          '<i class="fa-solid fa-download"></i> Download as JSON',
-      downloadBtnTitle:     'Save current code and test results for all exercises',
-      downloadHint:         'Saves your code and test results for personal documentation.',
-      downloadFilename:     'exercises-',
+      downloadBtn: '<i class="fa-solid fa-download"></i> Download as JSON',
+      downloadBtnTitle: 'Save current code and test results for all exercises',
+      downloadHint: 'Saves your code and test results for personal documentation.',
+      downloadFilename: 'exercises-',
       // Python message templates – use {} as placeholder for str.format()
-      msgForbiddenImport:   "Forbidden import: '{}'",
+      msgForbiddenImport: "Forbidden import: '{}'",
       msgForbiddenFunction: "Forbidden function: '{}'",
-      msgForbiddenMethod:   "Forbidden method: '.{}'",
-      msgForbiddenKeyword:  "Forbidden keyword: '{}'",
-      msgAssertionFailed:   'Assertion failed',
-      msgTestError:         'Error: {}',
-      msgSyntaxError:       'Syntax error in tests: {}',
+      msgForbiddenMethod: "Forbidden method: '.{}'",
+      msgForbiddenKeyword: "Forbidden keyword: '{}'",
+      msgAssertionFailed: 'Assertion failed',
+      msgTestError: 'Error: {}',
+      msgSyntaxError: 'Syntax error in tests: {}',
     },
     de: {
-      btnCheck:             '<i class="fa-solid fa-check"></i> Überprüfen',
-      btnCheckTitle:        'Code prüfen (Shift+Enter)',
-      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Zurücksetzen',
-      btnResetTitle:        'Starter-Code wiederherstellen',
-      running:              '⏳ Überprüfe…',
-      errorHeader:          '❌ Fehler im Code:',
-      unexpectedError:      '❌ Unerwarteter Fehler:',
-      stdoutLabel:          'Ausgabe:',
+      btnCheck: '<i class="fa-solid fa-check"></i> Überprüfen',
+      btnCheckTitle: 'Code prüfen (Shift+Enter)',
+      btnReset: '<i class="fa-solid fa-arrows-rotate"></i> Zurücksetzen',
+      btnResetTitle: 'Starter-Code wiederherstellen',
+      running: '⏳ Überprüfe…',
+      errorHeader: '❌ Fehler im Code:',
+      unexpectedError: '❌ Unerwarteter Fehler:',
+      stdoutLabel: 'Ausgabe:',
       allPassed: function (n) {
         return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
       },
       someFailed: function (p, t) {
         return '❌ ' + p + ' von ' + t + ' Test' + (t === 1 ? '' : 's') + ' bestanden';
       },
-      violationsHeader:     '🚫 Nicht erlaubt:',
+      violationsHeader: '🚫 Nicht erlaubt:',
       // Submission UI
-      submissionTitle:      '📋 Abgabe',
-      studentIdLabel:       'Student-ID',
+      submissionTitle: '📋 Abgabe',
+      studentIdLabel: 'Student-ID',
       studentIdPlaceholder: 'z.B. s123456',
-      quizIdLabel:          'Quiz-ID',
-      quizIdPlaceholder:    'z.B. quiz-01',
-      exportBtn:            '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren',
-      outputLabel:          'Kodierten String kopieren und abgeben:',
-      copyBtn:              '<i class="fa-regular fa-copy"></i> Kopieren',
-      copyOk:               '<i class="fa-solid fa-check"></i> Kopiert!',
-      validationError:      'Bitte Student-ID und Quiz-ID ausfüllen.',
-      encodingError:        'Fehler beim Kodieren: ',
+      quizIdLabel: 'Quiz-ID',
+      quizIdPlaceholder: 'z.B. quiz-01',
+      exportBtn: '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren',
+      outputLabel: 'Kodierten String kopieren und abgeben:',
+      copyBtn: '<i class="fa-regular fa-copy"></i> Kopieren',
+      copyOk: '<i class="fa-solid fa-check"></i> Kopiert!',
+      validationError: 'Bitte Student-ID und Quiz-ID ausfüllen.',
+      encodingError: 'Fehler beim Kodieren: ',
       // Download
-      downloadBtn:          '<i class="fa-solid fa-download"></i> Als JSON herunterladen',
-      downloadBtnTitle:     'Aktuellen Code und Testergebnisse aller Aufgaben speichern',
-      downloadHint:         'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.',
-      downloadFilename:     'aufgaben-',
+      downloadBtn: '<i class="fa-solid fa-download"></i> Als JSON herunterladen',
+      downloadBtnTitle: 'Aktuellen Code und Testergebnisse aller Aufgaben speichern',
+      downloadHint: 'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.',
+      downloadFilename: 'aufgaben-',
       // Python message templates
-      msgForbiddenImport:   "Verbotener Import: '{}'",
+      msgForbiddenImport: "Verbotener Import: '{}'",
       msgForbiddenFunction: "Verbotene Funktion: '{}'",
-      msgForbiddenMethod:   "Verbotene Methode: '.{}'",
-      msgForbiddenKeyword:  "Verbotenes Schlüsselwort: '{}'",
-      msgAssertionFailed:   'Assertion fehlgeschlagen',
-      msgTestError:         'Fehler: {}',
-      msgSyntaxError:       'Syntaxfehler in Tests: {}',
+      msgForbiddenMethod: "Verbotene Methode: '.{}'",
+      msgForbiddenKeyword: "Verbotenes Schlüsselwort: '{}'",
+      msgAssertionFailed: 'Assertion fehlgeschlagen',
+      msgTestError: 'Fehler: {}',
+      msgSyntaxError: 'Syntaxfehler in Tests: {}',
     },
   };
 
@@ -280,18 +280,18 @@
         '</div>';
     }
 
-    var tests   = data.tests || [];
-    var passed  = tests.filter(function (t) { return t.passed; }).length;
-    var total   = tests.length;
+    var tests = data.tests || [];
+    var passed = tests.filter(function (t) { return t.passed; }).length;
+    var total = tests.length;
     var allPass = total > 0 && passed === total;
 
     // Store result for submission export
     if (label && total > 0) {
       exerciseResults[label] = {
-        label:  label,
+        label: label,
         passed: passed,
-        total:  total,
-        tests:  tests.map(function (t) { return t.passed; }),
+        total: total,
+        tests: tests.map(function (t) { return t.passed; }),
       };
     }
 
@@ -333,17 +333,17 @@
 
     container.innerHTML = '';
 
-    var starterCode       = exerciseData.starter           || '';
-    var testsCode         = exerciseData.tests             || '';
-    var forbiddenImports  = exerciseData.forbiddenImports  || [];
+    var starterCode = exerciseData.starter || '';
+    var testsCode = exerciseData.tests || '';
+    var forbiddenImports = exerciseData.forbiddenImports || [];
     var forbiddenKeywords = exerciseData.forbiddenKeywords || [];
-    var label             = exerciseData.label;
-    var showHints         = exerciseData.showTestHints !== false;
+    var label = exerciseData.label;
+    var showHints = exerciseData.showTestHints !== false;
 
     // localStorage key scoped to this page + label
     var storageKey = 'pyex|' + window.location.pathname + '|' + label;
     var savedCode = null;
-    try { savedCode = localStorage.getItem(storageKey); } catch (e) {}
+    try { savedCode = localStorage.getItem(storageKey); } catch (e) { }
 
     // Monaco editor container
     var editorContainer = document.createElement('div');
@@ -404,7 +404,7 @@
       editor.onDidChangeModelContent(function () {
         clearTimeout(saveTimer);
         saveTimer = setTimeout(function () {
-          try { localStorage.setItem(storageKey, editor.getValue()); } catch (e) {}
+          try { localStorage.setItem(storageKey, editor.getValue()); } catch (e) { }
         }, 500);
       });
 
@@ -421,9 +421,9 @@
       var studentCode = editor.getValue();
 
       try {
-        mainPyodide.globals.set('_exercise_student_code',  studentCode);
-        mainPyodide.globals.set('_exercise_test_code',     testsCode);
-        mainPyodide.globals.set('_exercise_forbidden_imports',  mainPyodide.toPy(forbiddenImports));
+        mainPyodide.globals.set('_exercise_student_code', studentCode);
+        mainPyodide.globals.set('_exercise_test_code', testsCode);
+        mainPyodide.globals.set('_exercise_forbidden_imports', mainPyodide.toPy(forbiddenImports));
         mainPyodide.globals.set('_exercise_forbidden_keywords', mainPyodide.toPy(forbiddenKeywords));
 
         if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
@@ -436,7 +436,7 @@
         }
 
         await mainPyodide.loadPackagesFromImports(studentCode);
-        var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
+        var raw = await mainPyodide.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
         renderResult(resultArea, data, label, showHints);
 
@@ -455,7 +455,7 @@
     checkBtn.onclick = runCheck;
     resetBtn.onclick = function () {
       if (editor) editor.setValue(starterCode);
-      try { localStorage.removeItem(storageKey); } catch (e) {}
+      try { localStorage.removeItem(storageKey); } catch (e) { }
       resultArea.innerHTML = '';
     };
   }
@@ -469,19 +469,19 @@
     wrap.className = 'py-submission-header';
     wrap.innerHTML =
       '<div class="py-submission-header-inner">' +
-        '<h5 class="py-submission-title">' + L.submissionTitle + '</h5>' +
-        '<div class="py-submission-fields">' +
-          '<div class="py-submission-field">' +
-            '<label for="py-submission-student-id">' + L.studentIdLabel + '</label>' +
-            '<input type="text" id="py-submission-student-id" ' +
-                   'placeholder="' + escapeHtml(L.studentIdPlaceholder) + '" autocomplete="off">' +
-          '</div>' +
-          '<div class="py-submission-field">' +
-            '<label for="py-submission-quiz-id">' + L.quizIdLabel + '</label>' +
-            '<input type="text" id="py-submission-quiz-id" ' +
-                   'placeholder="' + escapeHtml(L.quizIdPlaceholder) + '" autocomplete="off">' +
-          '</div>' +
-        '</div>' +
+      '<h5 class="py-submission-title">' + L.submissionTitle + '</h5>' +
+      '<div class="py-submission-fields">' +
+      '<div class="py-submission-field">' +
+      '<label for="py-submission-student-id">' + L.studentIdLabel + '</label>' +
+      '<input type="text" id="py-submission-student-id" ' +
+      'placeholder="' + escapeHtml(L.studentIdPlaceholder) + '" autocomplete="off">' +
+      '</div>' +
+      '<div class="py-submission-field">' +
+      '<label for="py-submission-quiz-id">' + L.quizIdLabel + '</label>' +
+      '<input type="text" id="py-submission-quiz-id" ' +
+      'placeholder="' + escapeHtml(L.quizIdPlaceholder) + '" autocomplete="off">' +
+      '</div>' +
+      '</div>' +
       '</div>';
     return wrap;
   }
@@ -551,14 +551,14 @@
 
   async function exportResults() {
     var studentId = (document.getElementById('py-submission-student-id') || {}).value;
-    var quizId    = (document.getElementById('py-submission-quiz-id')    || {}).value;
+    var quizId = (document.getElementById('py-submission-quiz-id') || {}).value;
 
     studentId = (studentId || '').trim();
-    quizId    = (quizId    || '').trim();
+    quizId = (quizId || '').trim();
 
-    var msgEl     = document.getElementById('py-submission-msg');
-    var outWrap   = document.getElementById('py-submission-output-wrap');
-    var outArea   = document.getElementById('py-submission-output');
+    var msgEl = document.getElementById('py-submission-msg');
+    var outWrap = document.getElementById('py-submission-output-wrap');
+    var outArea = document.getElementById('py-submission-output');
 
     if (!studentId || !quizId) {
       if (msgEl) {
@@ -573,30 +573,30 @@
     // Collect results for every registered exercise (unattempted → 0/total)
     var allResults = (window.__pyExercises || []).map(function (ex) {
       return exerciseResults[ex.label] || {
-        label:  ex.label,
+        label: ex.label,
         passed: 0,
-        total:  0,        // 0 = not attempted
-        tests:  [],
+        total: 0,        // 0 = not attempted
+        tests: [],
       };
     });
 
     var payload = {
-      v:       1,
-      sid:     studentId,
-      qid:     quizId,
-      ts:      new Date().toISOString(),
+      v: 1,
+      sid: studentId,
+      qid: quizId,
+      ts: new Date().toISOString(),
       results: allResults,
     };
 
     try {
       mainPyodide.globals.set('_submission_payload', mainPyodide.toPy(payload));
-      mainPyodide.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
+      mainPyodide.globals.set('_submission_key', submissionConfig.submissionKey || 'py-exercise');
 
       var encoded = await mainPyodide.runPythonAsync(ENCODER_PY);
 
-      if (outArea)  outArea.value = encoded;
-      if (outWrap)  outWrap.style.display = '';
-      if (msgEl)    msgEl.innerHTML = '';
+      if (outArea) outArea.value = encoded;
+      if (outWrap) outWrap.style.display = '';
+      if (msgEl) msgEl.innerHTML = '';
 
     } catch (err) {
       if (msgEl) {
@@ -617,28 +617,60 @@
       var editor = exerciseEditors[ex.label];
       var result = exerciseResults[ex.label] || null;
       return {
-        label:   ex.label,
+        label: ex.label,
         caption: ex.caption || null,
-        code:    editor ? editor.getValue() : ex.starter,
-        result:  result,
+        code: editor ? editor.getValue() : ex.starter,
+        result: result,
       };
     });
 
     var data = {
       exported_at: new Date().toISOString(),
-      exercises:   exercises,
+      exercises: exercises,
     };
 
     var json = JSON.stringify(data, null, 2);
     var blob = new Blob([json], { type: 'application/json' });
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href     = url;
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
     a.download = L.downloadFilename + new Date().toISOString().slice(0, 10) + '.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Submit answer to BFF (backend for frontend.)
+   * 
+   */
+  function submitLti() {
+
+    //  url should INCLUDE ltik=... 
+    const url = document.querySelector("#LTI_SUBMIT_URL").textContent;
+    console.log(`submit to '${url}'...`);
+
+    var exercises = (window.__pyExercises || []).map(function (ex) {
+      var editor = exerciseEditors[ex.label];
+      var result = exerciseResults[ex.label] || null;
+      return {
+        label: ex.label,
+        caption: ex.caption || null,
+        code: editor ? editor.getValue() : ex.starter,
+        result: result,
+      };
+    });
+
+    var data = {
+      exported_at: new Date().toISOString(),
+      exercises: exercises,
+    };
+
+    var json = JSON.stringify(data, null, 2);
+
+    fetch(url, { method: "POST", body: json, headers: { "Content-Type": "application/json" } })
+
   }
 
   function buildDownloadSection() {
@@ -661,6 +693,28 @@
     return wrap;
   }
 
+  function buildLtiSection() {
+    console.log("Building LTI section");
+
+    var wrap = document.createElement('div');
+    wrap.className = 'py-lti-section';
+
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-outline-secondary py-lti-submit-btn';
+    btn.innerHTML = "lti...";
+    btn.type = 'button';
+    btn.title = "Lti ...";
+    btn.onclick = submitLti;
+
+    var hint = document.createElement('span');
+    hint.className = 'py-download-hint';
+    hint.textContent = "lti submit";
+
+    wrap.appendChild(btn);
+    wrap.appendChild(hint);
+    return wrap;
+  }
+
   function initDownload() {
     var cells = document.querySelectorAll('.py-exercise-cell');
     if (cells.length === 0) return;
@@ -673,10 +727,12 @@
       sep.className = 'py-footer-sep';
       subFooter.appendChild(sep);
       subFooter.appendChild(buildDownloadSection());
+      subFooter.appendChild(buildLtiSection());
     } else {
       var footer = document.createElement('div');
       footer.className = 'py-download-footer';
       footer.appendChild(buildDownloadSection());
+      footer.appendChild(buildLtiSection());
       var lastCell = cells[cells.length - 1];
       lastCell.parentNode.insertBefore(footer, lastCell.nextSibling);
     }
@@ -704,13 +760,13 @@
   document.addEventListener('DOMContentLoaded', function () {
     waitForReady(function () {
       // Set Python message globals once – used by CHECKER_PY and RUNNER_PY
-      mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
+      mainPyodide.globals.set('_msg_forbidden_import', L.msgForbiddenImport);
       mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
-      mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
-      mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
-      mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
-      mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
-      mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
+      mainPyodide.globals.set('_msg_forbidden_method', L.msgForbiddenMethod);
+      mainPyodide.globals.set('_msg_forbidden_keyword', L.msgForbiddenKeyword);
+      mainPyodide.globals.set('_msg_assertion_failed', L.msgAssertionFailed);
+      mainPyodide.globals.set('_msg_test_error', L.msgTestError);
+      mainPyodide.globals.set('_msg_syntax_error', L.msgSyntaxError);
 
       var exercises = window.__pyExercises || [];
       exercises.forEach(setupExercise);

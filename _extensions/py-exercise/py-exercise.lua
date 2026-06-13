@@ -167,6 +167,10 @@ local function findClasses(blocks)
   return hasPyExercise, hasPyodide
 end
 
+local function insert_lti_placeholder()
+
+  quarto.doc.include_text("before-body","<p id=\"LTI_SUBMIT_URL\">__LTI_PLACEHOLDER__</p>")
+end
 ----
 -- Phase 0 – Pandoc: if the document contains {py-exercise} blocks but no
 -- {pyodide-python} block, prepend a hidden setup cell so that the pyodide
@@ -175,6 +179,8 @@ end
 ----
 function Pandoc(doc)
   if not quarto.doc.is_format("html") then return doc end
+
+  insert_lti_placeholder()
 
   local hasPyExercise, hasPyodide = findClasses(doc.blocks)
 
