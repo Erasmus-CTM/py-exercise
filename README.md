@@ -245,3 +245,14 @@ assert fib(10) == 55, "fib(10) should return 55"
 | Pyodide 0.27+ (CDN) | Loaded automatically (standalone) |
 | Monaco Editor 0.46+ (CDN) | Loaded automatically (standalone) |
 | [coatless-quarto/pyodide](https://github.com/coatless-quarto/pyodide) or [Erasmus-CTM/Pyodide-Feedback](https://github.com/Erasmus-CTM/Pyodide-Feedback) | Optional – prevents the runtime from being loaded twice |
+
+---
+
+## Funding
+
+Part of this work was funded by the Erasmus+ project “Computational Thinking
+makes sense of Mathematics” (2023-1-NO01-KA220-HED-000166744).
+
+## License
+
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
