@@ -1,6 +1,6 @@
 title: py-exercise
-author: Michael Kallweit
-version: 0.1.0
+author: CTM Workshop
+version: 0.2.1
 quarto-required: ">=1.4.549"
 contributes:
   filters:

@@ -96,12 +96,61 @@
   // Utilities
   // ---------------------------------------------------------------------------
 
-  function waitForReady(callback) {
-    if (typeof mainPyodide !== 'undefined') {
-      callback();
-    } else {
-      setTimeout(function () { waitForReady(callback); }, 300);
+  // Laedt ein Skript genau einmal. Ist der Tag schon da, aber noch nicht
+  // fertig geladen, wird auf dessen load-Event gewartet - NICHT sofort
+  // aufgeloest. Sonst greift eine zweite Extension auf globals zu, die es
+  // noch gar nicht gibt.
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var existing = document.querySelector('script[src="' + src + '"]');
+      if (existing) {
+        if (existing.dataset.qLoaded === '1') { resolve(); return; }
+        existing.addEventListener('load', function () { resolve(); });
+        existing.addEventListener('error', function () {
+          reject(new Error('Failed to load: ' + src));
+        });
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { s.dataset.qLoaded = '1'; resolve(); };
+      s.onerror = function () { reject(new Error('Failed to load: ' + src)); };
+      document.head.appendChild(s);
+    });
+  }
+
+  async function ensurePyodide() {
+    // coatless-quarto/pyodide is loading — wait for its promise instead of loading a second instance
+    if (typeof qpyodideInstance !== 'undefined') {
+      window.mainPyodide = await qpyodideInstance;
+      return;
     }
+    // coatless already finished
+    if (typeof mainPyodide !== 'undefined') return;
+    // Standalone. Gemeinsames Promise, damit math-exercise und py-exercise auf
+    // derselben Seite nicht zwei Pyodide-Instanzen starten oder sich beim
+    // Laden ins Gehege kommen.
+    var cdnBase = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
+    if (!globalThis.__qExercisePyodide) {
+      globalThis.__qExercisePyodide = (async function () {
+        await loadScript(cdnBase + 'pyodide.js');
+        return await loadPyodide({ indexURL: cdnBase });
+      })();
+    }
+    window.mainPyodide = await globalThis.__qExercisePyodide;
+  }
+
+  // Monaco is normally already loaded by the pyodide extension. If not (standalone
+  // use), we load the AMD loader from CDN and let it fetch the editor itself.
+  async function ensureMonaco() {
+    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs';
+    if (typeof require === 'undefined') {
+      await loadScript(cdnBase + '/loader.js');
+    }
+    require.config({ paths: { vs: cdnBase } });
+    await new Promise(function (resolve) {
+      require(['vs/editor/editor.main'], resolve);
+    });
   }
 
   function escapeHtml(str) {
@@ -116,7 +165,7 @@
   // Submission state + locale
   // ---------------------------------------------------------------------------
 
-  var submissionConfig = (window.__pyExerciseConfig) || { submission: false, submissionKey: 'py-exercise', lang: 'en' };
+  var submissionConfig = window.__pyExerciseConfig || { submission: false, submissionKey: 'py-exercise', lang: 'en' };
   var L = LOCALES[submissionConfig.lang] || LOCALES['en'];
 
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
@@ -339,6 +388,7 @@
     var forbiddenKeywords = exerciseData.forbiddenKeywords || [];
     var label             = exerciseData.label;
     var showHints         = exerciseData.showTestHints !== false;
+    // caption is metadata only (used in downloadAll JSON), not rendered visually
 
     // localStorage key scoped to this page + label
     var storageKey = 'pyex|' + window.location.pathname + '|' + label;
@@ -701,22 +751,22 @@
   // ---------------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------------
-  document.addEventListener('DOMContentLoaded', function () {
-    waitForReady(function () {
-      // Set Python message globals once – used by CHECKER_PY and RUNNER_PY
-      mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
-      mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
-      mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
-      mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
-      mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
-      mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
-      mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
+  document.addEventListener('DOMContentLoaded', async function () {
+    await ensurePyodide();
+    await ensureMonaco();
 
-      var exercises = window.__pyExercises || [];
-      exercises.forEach(setupExercise);
-      initSubmission();
-      initDownload();
-    });
+    mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
+    mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
+    mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
+    mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
+    mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
+    mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
+    mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
+
+    var exercises = window.__pyExercises || [];
+    exercises.forEach(setupExercise);
+    initSubmission();
+    initDownload();
   });
 
 })();

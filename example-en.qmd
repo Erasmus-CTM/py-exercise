@@ -2,8 +2,8 @@
 title: "py-exercise – Feature Overview"
 subtitle: "One example per feature of the interactive Python exercise extension"
 filters:
-  - coatless-quarto/pyodide
   - py-exercise
+  - coatless-quarto/pyodide
 py-exercise:
   lang: en
   submission: true
@@ -18,11 +18,6 @@ py-exercise:
 This document walks through every feature of the `py-exercise` extension.
 Write your solution in the editor and press **Check** (or **Shift+Enter**) to
 run the hidden unit tests.
-
-```{pyodide-python}
-#| context: setup
-# Initialises Pyodide and Monaco – required for py-exercise cells.
-```
 
 ---
 

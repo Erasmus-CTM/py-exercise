@@ -5,22 +5,23 @@
 
 /* Exercise container */
 .py-exercise-cell {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--bs-border-color, #dee2e6);
   border-left: 4px solid #0d6efd;
   border-radius: 6px;
   padding: 1rem 1.25rem;
   margin: 1.5rem 0;
-  background: #f8f9fa;
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  color: var(--bs-body-color, #212529);
 }
 
-/* Monaco editor wrapper */
+/* Monaco editor wrapper (Monaco itself switches vs/vs-dark via JS) */
 .py-exercise-editor {
-  border: 1px solid #ced4da;
+  border: 1px solid var(--bs-border-color, #ced4da);
   border-radius: 4px;
   overflow: hidden;
   min-height: 80px;
   margin-bottom: 0.75rem;
-  background: #ffffff;
+  background: var(--bs-body-bg, #ffffff);
 }
 
 /* Button bar */
@@ -37,7 +38,7 @@
 
 /* Running indicator */
 .py-exercise-running {
-  color: #6c757d;
+  color: var(--bs-secondary-color, #6c757d);
   font-style: italic;
   padding: 0.4rem 0;
 }
@@ -64,8 +65,9 @@
 
 /* Captured stdout from student code */
 .py-exercise-stdout {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
+  background: var(--bs-body-bg, #ffffff);
+  color: var(--bs-body-color, #212529);
+  border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: 4px;
   padding: 0.4rem 0.75rem;
   margin-bottom: 0.6rem;
@@ -78,7 +80,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6c757d;
+  color: var(--bs-secondary-color, #6c757d);
   margin-bottom: 0.2rem;
 }
 
@@ -166,10 +168,11 @@
    ============================================================ */
 
 .py-submission-header {
-  border: 1px solid #c3cfe2;
+  border: 1px solid var(--bs-border-color, #c3cfe2);
   border-left: 4px solid #198754;
   border-radius: 6px;
-  background: #f0faf4;
+  background: var(--bs-tertiary-bg, #f0faf4);
+  color: var(--bs-body-color, #212529);
   padding: 0.85rem 1.25rem;
   margin-bottom: 2rem;
 }
@@ -226,10 +229,11 @@
 
 /* Footer */
 .py-submission-footer {
-  border: 1px solid #c3cfe2;
+  border: 1px solid var(--bs-border-color, #c3cfe2);
   border-left: 4px solid #198754;
   border-radius: 6px;
-  background: #f0faf4;
+  background: var(--bs-tertiary-bg, #f0faf4);
+  color: var(--bs-body-color, #212529);
   padding: 1rem 1.25rem;
   margin-top: 2rem;
 }
@@ -279,10 +283,11 @@
 
 /* Download section (inside submission footer or standalone) */
 .py-download-footer {
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--bs-border-color, #dee2e6);
   border-left: 4px solid #6c757d;
   border-radius: 6px;
-  background: #f8f9fa;
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  color: var(--bs-body-color, #212529);
   padding: 0.85rem 1.25rem;
   margin-top: 2rem;
 }
