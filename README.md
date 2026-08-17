@@ -7,16 +7,6 @@ Supports forbidden-construct checks, optional submission export, and multilingua
 
 ---
 
-Interaktive Python-Programmieraufgaben mit versteckten Unit-Tests, die vollständig
-im Browser ausgeführt werden – kein Server, kein Backend, nur clientseitiges
-[Pyodide](https://pyodide.org) + [Monaco Editor](https://microsoft.github.io/monaco-editor/).
-
-Studierende sehen Startercode und bearbeiten ihn im Editor. Die versteckten Tests
-werden beim Klick auf **Ausführen & Testen** automatisch geprüft.
-Optionale Abgabe kodiert Ergebnisse sicher für den Dozenten.
-
----
-
 ## Installation
 
 ```bash
@@ -25,63 +15,63 @@ quarto add Erasmus-CTM/Py-Exercise
 
 ---
 
-## Einbinden
+## Usage
 
-**Standalone** (kein zusätzlicher Filter nötig – Pyodide und Monaco Editor werden automatisch
-von CDN geladen):
+**Standalone** (no additional filter needed – Pyodide and Monaco Editor are automatically
+loaded from a CDN):
 
 ```yaml
 filters:
   - Erasmus-CTM/py-exercise
 ```
 
-**Kombiniert mit einer Pyodide-Extension** (empfohlen, wenn auf derselben Seite schon eine
-Pyodide-Extension aktiv ist – verhindert doppeltes Laden der Runtime):
+**Combined with a Pyodide extension** (recommended if a Pyodide extension is already
+active on the same page – prevents the runtime from being loaded twice):
 
 ```yaml
 filters:
-  - coatless-quarto/pyodide       # oder Erasmus-CTM/pyodide-feedback
-  - Erasmus-CTM/py-exercise       # muss nach der Pyodide-Extension stehen
+  - coatless-quarto/pyodide       # or Erasmus-CTM/pyodide-feedback
+  - Erasmus-CTM/py-exercise       # must come after the Pyodide extension
 ```
 
 ---
 
-## Grundsyntax
+## Basic Syntax
 
 ````markdown
 ```{py-exercise}
-#| label: aufgabe-1
-#| caption: Addition implementieren
+#| label: task-1
+#| caption: Implement addition
 def add(a, b):
     pass
 
 ## TESTS ##
-assert add(1, 2) == 3,   "add(1, 2) sollte 3 ergeben"
-assert add(0, 0) == 0,   "add(0, 0) sollte 0 ergeben"
-assert add(-1, 1) == 0,  "add(-1, 1) sollte 0 ergeben"
+assert add(1, 2) == 3,   "add(1, 2) should return 3"
+assert add(0, 0) == 0,   "add(0, 0) should return 0"
+assert add(-1, 1) == 0,  "add(-1, 1) should return 0"
 ```
 ````
 
-Alles **oberhalb** von `## TESTS ##` wird dem Studierenden angezeigt.  
-Alles **unterhalb** ist versteckt und wird nach dem Ausführen automatisch geprüft.
+Everything **above** `## TESTS ##` is shown to the student.
+Everything **below** is hidden and checked automatically after running the code.
 
 ---
 
-## Zell-Optionen (`#|`)
+## Cell Options (`#|`)
 
-| Option | Typ | Standard | Beschreibung |
+| Option | Type | Default | Description |
 |--------|-----|----------|--------------|
-| `label` | String | `py-exercise-N` | Eindeutige ID der Aufgabe |
-| `caption` | String | — | Titel über der Aufgabe |
-| `forbidden-imports` | kommasepariert | — | Verbotene `import`-Anweisungen |
-| `forbidden-keywords` | kommasepariert | — | Verbotene Python-Schlüsselwörter |
-| `show-test-hints` | `true` / `false` | `true` | Assertion-Nachricht bei Fehler anzeigen |
+| `label` | String | `py-exercise-N` | Unique ID of the exercise |
+| `caption` | String | — | Title shown above the exercise |
+| `forbidden-imports` | comma-separated | — | Forbidden `import` statements |
+| `forbidden-keywords` | comma-separated | — | Forbidden Python keywords |
+| `show-test-hints` | `true` / `false` | `true` | Show the assertion message on failure |
 
 ---
 
-## Globale Optionen (YAML-Frontmatter)
+## Global Options (YAML Frontmatter)
 
-Gelten für alle Aufgaben im Dokument, können auf Zellebene überschrieben werden:
+Apply to all exercises in the document, can be overridden at the cell level:
 
 ```yaml
 py-exercise:
@@ -89,56 +79,55 @@ py-exercise:
   forbidden-keywords: [for, while, sorted]
   show-test-hints: true
   submission: true
-  submission-key: "mein-geheimer-schluessel"
-  lang: de
+  submission-key: "my-secret-key"
+  lang: en
 ```
 
-| Option | Standard | Beschreibung |
+| Option | Default | Description |
 |--------|----------|--------------|
-| `forbidden-imports` | `[]` | Verbotene Imports für alle Aufgaben |
-| `forbidden-keywords` | `[]` | Verbotene Schlüsselwörter für alle Aufgaben |
-| `show-test-hints` | `true` | Assertion-Nachricht bei fehlgeschlagenen Tests |
-| `submission` | `false` | Abgabe-Modus aktivieren |
-| `submission-key` | `"py-exercise"` | XOR-Schlüssel für die Ergebniskodierung |
-| `lang` | `"en"` | Sprache der Benutzeroberfläche (`"de"` oder `"en"`) |
+| `forbidden-imports` | `[]` | Forbidden imports for all exercises |
+| `forbidden-keywords` | `[]` | Forbidden keywords for all exercises |
+| `show-test-hints` | `true` | Show the assertion message on failed tests |
+| `submission` | `false` | Enable submission mode |
+| `submission-key` | `"py-exercise"` | XOR key used to encode results |
+| `lang` | `"en"` | UI language (`"de"` or `"en"`) |
 
 ---
 
-## Sprache der Oberfläche
+## UI Language
 
-Unterstützt werden derzeit **Deutsch (`de`)** und **Englisch (`en`)**.
-**Standard ist Englisch** – ohne Angabe erscheint die Oberfläche englisch.
+Currently supported: **German (`de`)** and **English (`en`)**.
+**The default is English** – without any setting, the UI appears in English.
 
-Die Extension liest in dieser Reihenfolge:
+The extension reads the language in this order:
 
-1. `py-exercise: lang:` – expliziter Override
-2. **Quartos eigenes `lang:`** – der Normalfall
-3. `en` – Fallback
+1. `py-exercise: lang:` – explicit override
+2. **Quarto's own `lang:`** – the normal case
+3. `en` – fallback
 
-Es genügt also Quartos Standard-Schlüssel, eine Extra-Option ist nicht nötig:
+Quarto's standard key is therefore enough; no extra option is needed:
 
 ```yaml
 ---
-title: "Python-Übungen"
+title: "Python Exercises"
 lang: de
 filters:
   - Erasmus-CTM/py-exercise
 ---
 ```
 
-Regionalvarianten werden gekürzt (`de-DE` → `de`). Eine nicht unterstützte
-Sprache (z. B. `fr`) fällt still auf Englisch zurück und bricht das Rendern
-**nicht** ab.
+Regional variants are shortened (`de-DE` → `de`). An unsupported language
+(e.g. `fr`) silently falls back to English and does **not** break rendering.
 
-Übersetzt sind Knöpfe, Testergebnisse, Abgabe- und Download-Bereich sowie die
-Meldungen der Regelprüfung (verbotene Imports usw.) – letztere werden dafür in
-die Python-Umgebung übergeben.
+Buttons, test results, the submission and download sections, and the rule-check
+messages (forbidden imports, etc.) are all translated – the latter are passed
+into the Python environment for that purpose.
 
-### Mehrsprachige Projekte
+### Multilingual Projects
 
-Da die Sprache aus Quartos `lang:` kommt, ist die Extension ohne Zusatzaufwand
-mit mehrsprachigen Setups kompatibel. Bei einem Aufbau über Quarto-Profile
-genügt je ein `lang:` pro Profil:
+Since the language comes from Quarto's `lang:`, the extension works with
+multilingual setups without any extra effort. When building via Quarto
+profiles, one `lang:` per profile is enough:
 
 ```yaml
 # _quarto-de.yml
@@ -154,45 +143,45 @@ project:
 lang: en
 ```
 
-Jede Sprache ist ein eigener Render-Durchlauf; die Texte stehen danach fest im
-jeweiligen HTML. Ein Sprachumschalter, der auf die andere Fassung verlinkt,
-wechselt damit automatisch auch die Sprache der Extension.
+Each language is a separate render pass; the text is then fixed in the
+respective HTML output. A language switcher that links to the other version
+therefore automatically switches the extension's language as well.
 
-### Weitere Sprache ergänzen
+### Adding Another Language
 
-1. In `_extensions/py-exercise/py-exercise.js` einen `LOCALES`-Block nach dem
-   Vorbild von `de` anlegen (alle Schlüssel übernehmen).
-2. In `py-exercise.lua` den Sprachcode zu `supportedLangs` hinzufügen und die
-   Tabelle `noscriptMessages` ergänzen.
+1. In `_extensions/py-exercise/py-exercise.js`, add a `LOCALES` block modeled
+   on `de` (copy all keys).
+2. In `py-exercise.lua`, add the language code to `supportedLangs` and extend
+   the `noscriptMessages` table.
 
 ---
 
-## Regelprüfung
+## Rule Checking
 
-Wenn ein Studierender verbotene Konstrukte verwendet, wird der Code **nicht ausgeführt**
-und stattdessen eine Fehlermeldung angezeigt.
+If a student uses a forbidden construct, the code is **not executed** and an
+error message is shown instead.
 
 ```yaml
-# Aufgabenspezifisch:
+# Per exercise:
 #| forbidden-imports: os, sys
 #| forbidden-keywords: for, while, lambda
 ```
 
-Typische Anwendungsfälle:
-- `for`/`while` verbieten → Lösung muss mit Listenkomprehension oder `map` arbeiten
-- `sorted` verbieten → eigener Sortieralgorithmus gefordert
-- `os`, `sys`, `subprocess` verbieten → Sicherheit in Lernumgebungen
+Typical use cases:
+- Forbidding `for`/`while` → the solution must use a list comprehension or `map`
+- Forbidding `sorted` → a custom sorting algorithm is required
+- Forbidding `os`, `sys`, `subprocess` → safety in learning environments
 
 ---
 
-## Abgabe-Modus
+## Submission Mode
 
-Mit `submission: true` erscheint ein Abgabe-Header mit Eingabefeldern für
-**Matrikelnummer** und **Quiz-ID**. Nach erfolgreich bestandenen Tests
-kann der Studierende das Ergebnis als **JSON-Datei herunterladen**.
+With `submission: true`, a submission header appears with input fields for
+**student ID** and **quiz ID**. After the tests pass successfully, the
+student can download the result as a **JSON file**.
 
-Die Ergebnisse werden mit dem `submission-key` XOR-kodiert und Base64-encodiert,
-sodass Rohergebnisse nicht ohne den Schlüssel lesbar sind.
+Results are XOR-encoded with the `submission-key` and Base64-encoded, so the
+raw results cannot be read without the key.
 
 ```yaml
 py-exercise:
@@ -202,57 +191,57 @@ py-exercise:
 
 ---
 
-## Testausgabe
+## Test Output
 
-Jeder Test zeigt nach dem Ausführen:
+After running, each test shows:
 
-- ✅ **Bestanden** – Test erfolgreich
-- ❌ **Fehlgeschlagen** – mit der Assertion-Nachricht (wenn `show-test-hints: true`)
+- ✅ **Passed** – test succeeded
+- ❌ **Failed** – with the assertion message (if `show-test-hints: true`)
 
-Die Assertion-Nachricht ist der Text nach dem Komma in `assert ..., "Nachricht"`.
-Wird `show-test-hints: false` gesetzt, sehen Studierende nur ob ein Test fehl-
-geschlagen ist, ohne Hinweis auf den Grund.
+The assertion message is the text after the comma in `assert ..., "message"`.
+If `show-test-hints: false` is set, students only see whether a test failed,
+without a hint as to why.
 
 ---
 
-## Vollständiges Beispiel
+## Full Example
 
 ````markdown
 ---
-title: "Python Übungen – SoSe 2025"
+title: "Python Exercises – SoSe 2025"
 filters:
   - coatless-quarto/pyodide
   - Erasmus-CTM/py-exercise
 py-exercise:
   submission: true
   submission-key: "sose25-final"
-  lang: de
+  lang: en
 ---
 
 ```{py-exercise}
 #| label: fibonacci
-#| caption: Fibonacci-Folge
+#| caption: Fibonacci sequence
 #| forbidden-keywords: for, while
-Implementiere eine rekursive Funktion `fib(n)`,
-die die n-te Fibonacci-Zahl zurückgibt (fib(0) = 0, fib(1) = 1).
+Implement a recursive function `fib(n)` that returns the n-th
+Fibonacci number (fib(0) = 0, fib(1) = 1).
 
 def fib(n):
     pass
 
 ## TESTS ##
-assert fib(0) == 0,  "fib(0) sollte 0 ergeben"
-assert fib(1) == 1,  "fib(1) sollte 1 ergeben"
-assert fib(6) == 8,  "fib(6) sollte 8 ergeben"
-assert fib(10) == 55, "fib(10) sollte 55 ergeben"
+assert fib(0) == 0,  "fib(0) should return 0"
+assert fib(1) == 1,  "fib(1) should return 1"
+assert fib(6) == 8,  "fib(6) should return 8"
+assert fib(10) == 55, "fib(10) should return 55"
 ```
 ````
 
 ---
 
-## Abhängigkeiten
+## Dependencies
 
-| Abhängigkeit | Zweck |
+| Dependency | Purpose |
 |---|---|
-| Pyodide 0.27+ (CDN) | Wird automatisch geladen (standalone) |
-| Monaco Editor 0.46+ (CDN) | Wird automatisch geladen (standalone) |
-| [coatless-quarto/pyodide](https://github.com/coatless-quarto/pyodide) oder [Erasmus-CTM/Pyodide-Feedback](https://github.com/Erasmus-CTM/Pyodide-Feedback) | Optional – verhindert doppeltes Laden der Runtime |
+| Pyodide 0.27+ (CDN) | Loaded automatically (standalone) |
+| Monaco Editor 0.46+ (CDN) | Loaded automatically (standalone) |
+| [coatless-quarto/pyodide](https://github.com/coatless-quarto/pyodide) or [Erasmus-CTM/Pyodide-Feedback](https://github.com/Erasmus-CTM/Pyodide-Feedback) | Optional – prevents the runtime from being loaded twice |
