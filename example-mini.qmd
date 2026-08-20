@@ -1,8 +1,10 @@
 ---
 title: "py-exercise – Mini example"
+format:
+  html:
+    embed-resources: true
 filters:
   - py-exercise
-  - coatless-quarto/pyodide
 ---
 
 

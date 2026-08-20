@@ -17,21 +17,12 @@ quarto add Erasmus-CTM/Py-Exercise
 
 ## Usage
 
-**Standalone** (no additional filter needed – Pyodide and Monaco Editor are automatically
-loaded from a CDN):
+No additional filter needed – Pyodide and Monaco Editor are automatically
+loaded from a CDN:
 
 ```yaml
 filters:
   - Erasmus-CTM/py-exercise
-```
-
-**Combined with a Pyodide extension** (recommended if a Pyodide extension is already
-active on the same page – prevents the runtime from being loaded twice):
-
-```yaml
-filters:
-  - coatless-quarto/pyodide       # or Erasmus-CTM/pyodide-feedback
-  - Erasmus-CTM/py-exercise       # must come after the Pyodide extension
 ```
 
 ---
@@ -210,7 +201,6 @@ without a hint as to why.
 ---
 title: "Python Exercises – SoSe 2025"
 filters:
-  - coatless-quarto/pyodide
   - Erasmus-CTM/py-exercise
 py-exercise:
   submission: true
@@ -242,9 +232,8 @@ assert fib(10) == 55, "fib(10) should return 55"
 
 | Dependency | Purpose |
 |---|---|
-| Pyodide 0.27+ (CDN) | Loaded automatically (standalone) |
-| Monaco Editor 0.46+ (CDN) | Loaded automatically (standalone) |
-| [coatless-quarto/pyodide](https://github.com/coatless-quarto/pyodide) or [Erasmus-CTM/Pyodide-Feedback](https://github.com/Erasmus-CTM/Pyodide-Feedback) | Optional – prevents the runtime from being loaded twice |
+| Pyodide 0.27+ (CDN) | Loaded automatically |
+| Monaco Editor 0.46+ (CDN) | Loaded automatically |
 
 ---
 

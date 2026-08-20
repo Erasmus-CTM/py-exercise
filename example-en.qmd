@@ -1,9 +1,11 @@
 ---
 title: "py-exercise – Feature Overview"
 subtitle: "One example per feature of the interactive Python exercise extension"
+format:
+  html:
+    embed-resources: true
 filters:
   - py-exercise
-  - coatless-quarto/pyodide
 py-exercise:
   lang: en
   submission: true
