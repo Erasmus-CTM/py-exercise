@@ -245,12 +245,3 @@ makes sense of Mathematics” (2023-1-NO01-KA220-HED-000166744).
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
-
-## Shared-feedback integration development
-
-The [integration workbench](integration/feedback/README.md) builds a common
-Quarto page from explicit ai-feedback, py-exercise, math-exercise and
-pyodide-interaktiv revisions. Run `python scripts/setup-feedback-integration.py
---test` to fetch the selected sources, render the page and run regressions.
-The setup manifest, browser smoke checks and CI artifact prepare py-exercise
-as the first shared-feedback integration; the adapter itself is a later change.
