@@ -1,0 +1,29 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+  resources:
+    - resolved-repos.json
+lang: en
+website:
+  title: CTM feedback integration
+format:
+  html:
+    toc: true
+filters:
+  - ai-feedback
+  - pyodide-interaktiv
+  - math-exercise
+  - py-exercise
+ai-feedback:
+  mode: copy
+  storage: session
+pyodide:
+  packages: []
+  show-startup-message: false
+  feedback: true
+  feedback-storage: session
+py-exercise:
+  show-test-hints: true
+  submission: false

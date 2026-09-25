@@ -1,0 +1,60 @@
+---
+title: "Shared feedback integration workbench"
+---
+
+This page combines the current branches of all four extensions. It is the
+baseline before migrating feedback into the shared API. The standalone text
+activity uses the shared cogwheel; mathematics and Pyodide still use their
+existing feedback implementations. Python unit-test exercises have no feedback
+adapter yet. This page will gain migration checks alongside each adapter.
+
+[Exact revisions used for this build](resolved-repos.json)
+
+## Shared AI feedback
+
+::: {.ai-feedback #shared-writing profile="language-quality" response-language="es" feedback-language="en" learner-level="Spanish course 1" context="none"}
+Write one Spanish sentence saying where you live, then request feedback.
+
+::: {.feedback-starter}
+Yo vive en Trondheim.
+:::
+:::
+
+## Python unit-test exercise
+
+Implement addition, then choose **Check**. The starter deliberately subtracts.
+Use **Reset** to restore it. This is the first planned shared-feedback consumer.
+
+```{py-exercise}
+#| label: integration-add
+#| forbidden-imports: os
+#| show-test-hints: true
+def add(a, b):
+    return a - b
+
+## TESTS ##
+assert add(1, 2) == 3, "add(1, 2) should return 3"
+assert add(0, 0) == 0, "add(0, 0) should return 0"
+assert add(-1, 1) == 0, "add(-1, 1) should return 0"
+```
+
+## Mathematics
+
+Enter the numerical answer and choose **Check**. The legacy Feedback button is
+also present; it will move to the shared API in a later migration.
+
+```{math-exercise}
+#| label: integration-math
+What is $6\cdot7$? _[42]
+```
+
+## Interactive Python
+
+Run this code and check that the output is **6**. Its existing three-stage
+feedback will be migrated after py-exercise.
+
+```{pyodide-python}
+#| label: integration-python
+values = [1, 2, 3]
+print(sum(values))
+```

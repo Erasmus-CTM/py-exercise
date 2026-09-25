@@ -1,0 +1,12 @@
+{
+  "name": "ctm-feedback-integration",
+  "private": true,
+  "scripts": {
+    "test": "node --test rendered.test.cjs",
+    "test:browser": "node browser-smoke.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0",
+    "playwright": "1.55.1"
+  }
+}
