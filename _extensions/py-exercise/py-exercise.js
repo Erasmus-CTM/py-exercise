@@ -425,6 +425,12 @@
     container.appendChild(resultArea);
 
     var editor;
+    var assessment = null;
+    var feedbackAdapter = null;
+    function clearFeedback() {
+      assessment = null;
+      if (feedbackAdapter) feedbackAdapter.invalidate();
+    }
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(editorContainer, {
         value: savedCode !== null ? savedCode : starterCode,
@@ -441,6 +447,18 @@
       // Store reference so downloadAll() can read the current code later
       exerciseEditors[label] = editor;
 
+      if (submissionConfig.feedback) {
+        feedbackAdapter = window.PyExerciseFeedback.attach({
+          container: container, buttonBar: buttonBar, label: label,
+          uiLanguage: submissionConfig.lang || 'en',
+          feedbackLanguage: exerciseData.feedbackLanguage || submissionConfig.lang || 'en',
+          learnerLevel: exerciseData.learnerLevel || '', task: exerciseData.task,
+          forbiddenImports: forbiddenImports, forbiddenKeywords: forbiddenKeywords,
+          getCode: function () { return editor.getValue(); },
+          getAssessment: function () { return assessment; }
+        });
+      }
+
       var updateHeight = function () {
         var h = Math.max(80, editor.getContentHeight());
         editorContainer.style.height = h + 'px';
@@ -452,6 +470,7 @@
       // Persist code across reloads
       var saveTimer;
       editor.onDidChangeModelContent(function () {
+        clearFeedback();
         clearTimeout(saveTimer);
         saveTimer = setTimeout(function () {
           try { localStorage.setItem(storageKey, editor.getValue()); } catch (e) {}
@@ -463,6 +482,7 @@
 
     async function runCheck() {
       if (!editor) return;
+      clearFeedback();
 
       resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
       checkBtn.disabled = true;
@@ -481,6 +501,7 @@
           var violations = JSON.parse(violationsRaw);
           if (violations.length > 0) {
             renderViolations(resultArea, violations);
+            if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
             return;
           }
         }
@@ -489,6 +510,12 @@
         var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
         renderResult(resultArea, data, label, showHints);
+        if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {
+          status: data.student_error ? 'learner code raised an error' : 'checked',
+          passed: (data.tests || []).filter(function (t) { return t.passed; }).length,
+          total: (data.tests || []).length,
+          stdout: data.stdout || ''
+        }};
 
       } catch (err) {
         resultArea.innerHTML =
@@ -504,6 +531,7 @@
 
     checkBtn.onclick = runCheck;
     resetBtn.onclick = function () {
+      clearFeedback();
       if (editor) editor.setValue(starterCode);
       try { localStorage.removeItem(storageKey); } catch (e) {}
       resultArea.innerHTML = '';

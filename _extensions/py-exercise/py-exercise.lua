@@ -45,6 +45,7 @@ local submissionKey     = "py-exercise"
 
 -- Whether failed tests reveal their assertion message (default: true)
 local globalShowTestHints = true
+local feedbackEnabled = false
 
 -- Language / locale (default: English)
 local lang = "en"
@@ -169,12 +170,13 @@ local function ensureExerciseSetup()
     submission    = submissionEnabled,
     submissionKey = submissionKey,
     lang          = lang,
+    feedback      = feedbackEnabled,
   }
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
 
   -- JS
-  local js = readFile("py-exercise.js")
+  local js = (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
   quarto.doc.include_text("after-body",
     "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
 end
@@ -225,6 +227,7 @@ local function Meta(meta)
   local cfg = meta["py-exercise"]
 
   globalForbiddenImports  = metaToList(cfg["forbidden-imports"])
+  feedbackEnabled = pandoc.utils.stringify(cfg["feedback"] or "false") == "true"
   globalForbiddenKeywords = metaToList(cfg["forbidden-keywords"])
 
   if cfg["submission"] then
@@ -254,6 +257,9 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
+  if feedbackEnabled and (not opts["task"] or opts["task"] == "") then
+    error("py-exercise: shared feedback requires #| task: with the learner's assignment.")
+  end
 
   local cellForbiddenImports  = splitCommaList(opts["forbidden-imports"])
   local cellForbiddenKeywords = splitCommaList(opts["forbidden-keywords"])
@@ -275,6 +281,9 @@ local function CodeBlock(el)
     forbiddenImports  = forbiddenImports,
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
+    task              = opts["task"],
+    feedbackLanguage  = opts["feedback-language"] or lang,
+    learnerLevel      = opts["learner-level"] or "",
   }
 
   local dataJson = quarto.json.encode(exerciseData)

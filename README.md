@@ -245,3 +245,23 @@ makes sense of Mathematics” (2023-1-NO01-KA220-HED-000166744).
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+## Shared feedback integration branch
+
+This branch supports the shared `ai-feedback` extension. Install both extensions,
+list `ai-feedback` before `py-exercise` in the Quarto filters, and enable:
+
+```yaml
+py-exercise:
+  feedback: true
+```
+
+Supply `#| task: ...` in each Python cell with the learner's assignment. Optional
+`#| feedback-language: en` and `#| learner-level: ...` configure the feedback.
+Each editor then gets **Feedback** and the shared settings cogwheel. Feedback
+uses current code without executing it. Checker summaries and learner output
+are included only after checking that exact code; edits and Reset invalidate
+them. Hidden test source, assertion messages, tracebacks and submission details
+are excluded. Without `feedback: true`, existing checker behavior is unchanged.
+
+The integration is developed and tested in Erasmus-CTM/ai-feedback before a
+consumer pull request is opened.
