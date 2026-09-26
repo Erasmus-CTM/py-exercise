@@ -3,14 +3,14 @@
 ::: {.callout-note .example-author-notes .ai-feedback-ignore}
 ### For course authors
 
-Each pair below uses identical task text, starter code and tests. Only the
-named `feedback-policy` changes. The definitions live in
-`feedback/python-policies.yml`, loaded by this page's `ai-feedback.page-policy-files`.
-Open **Show source and policy YAML** immediately after an example to see both.
+Each pair asks students to do the same task with the same starting code. What
+changes is the kind of help: a question, an explanation or a focused review.
+Try both, then consider which would suit a practice session or a review lesson.
+Open the source to see the instructions behind the feedback.
 
-Press **Check**, then **Feedback**. In copy mode, compare the generated prompts;
-with a configured API, compare the responses (wording depends on the model).
-Feedback does not run Python. A new Check resets the hint sequence by default.
+Press **Check**, then **Feedback**. If a message appears to copy, paste it into
+an AI chat. With your course's feedback service set up, the reply appears here.
+Another Check starts the hints again.
 :::
 
 ### Debugging: guided practice versus a worked review

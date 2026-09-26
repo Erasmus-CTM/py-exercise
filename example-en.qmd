@@ -1,6 +1,6 @@
 ---
-title: "py-exercise – Feature Overview"
-subtitle: "One example per feature of the interactive Python exercise extension"
+title: "Build a short Python practice session"
+subtitle: "Tasks to try, teaching choices to borrow"
 format:
   html:
     embed-resources: true
@@ -22,17 +22,19 @@ py-exercise:
   show-test-hints: true
 ---
 
-This document walks through every feature of the `py-exercise` extension.
-Write your solution in the editor and press **Check** (or **Shift+Enter**) to
-run the hidden unit tests.
+Start with a small function, check what it does, and improve it. These activities
+show ways to support that process: a clear task, useful checks and feedback
+that suits the moment. Open the source below an activity to adapt it.
+
+Press **Check** (or **Shift+Enter**) to try your work. **Feedback** prepares a
+message for an AI chat, or shows advice here if your course has arranged that.
 
 ---
 
-## 1 – Basic exercise
+## 1 – Start with one small goal
 
-The simplest exercise: a `label` to identify it, starter code, and hidden
-`assert` statements below `## TESTS ##`. Each assertion is one test and is
-reported individually.
+Give students a single function to complete. A few well-chosen checks help them
+see what works and what still needs attention.
 
 **Task:** Write a function `add(a, b)` that returns the sum of two numbers.
 
@@ -49,10 +51,9 @@ assert add(-1, 1) == 0,  "add(-1, 1) should return 0"
 
 ---
 
-## 2 – Caption
+## 2 – Give the task a clear name
 
-Use `#| caption:` to show a short title above the editor. Useful when you
-embed exercises inside a longer document and want to label them clearly.
+A short title helps students see the purpose of the next activity.
 
 ```{py-exercise}
 #| label: square
@@ -68,10 +69,10 @@ assert square(-4) == 16, "square(-4) should return 16"
 
 ---
 
-## 3 – Capturing print() output
+## 3 – Printing and returning are different
 
-`print()` calls in the student's code are captured and shown below the editor,
-independently of the test results.
+Use this task to discuss the difference between displaying a message and
+returning a value that another part of a program can use.
 
 **Task:** Write a function `greet(name)` that **prints** `"Hello, <name>!"`
 and also **returns** that string.
@@ -88,14 +89,10 @@ assert greet("Alice") == "Hello, Alice!", "greet('Alice') should return 'Hello, 
 
 ---
 
-## 4 – Forbidden imports (per-cell)
+## 4 – Practise a formula before using a library
 
-`#| forbidden-imports:` blocks specific module names (both `import x` and
-`from x import …` forms). The check runs on the AST — the code is never
-executed if a violation is found.
-
-> The global front matter of this document already forbids `os`, `sys`, and
-> `subprocess` for every exercise. The cell below additionally forbids `math`.
+Ask students to implement the formula themselves before using a ready-made
+library. Make the restriction explicit in the task.
 
 **Task:** Write a function `circle_area(r)` that returns the area of a circle
 with radius `r`. Use `3.14159` instead of `math.pi`.
@@ -115,10 +112,10 @@ assert circle_area(0) == 0, "circle_area(0) should be 0"
 
 ---
 
-## 5 – Forbidden keywords (per-cell)
+## 5 – Practise a particular method
 
-`#| forbidden-keywords:` blocks built-in functions, method names, or language
-keywords (`for`, `while`, `lambda`, `class`, `with`, `try`, `raise`, …).
+When the goal is to understand a loop or recursion, ask students to use that
+method. Explain the learning reason for the restriction.
 
 **Task:** Write a function `my_sum(lst)` that returns the sum of all elements
 in a list. The built-in `sum()` is **not allowed**.
@@ -154,11 +151,11 @@ assert factorial(5) == 120, "factorial(5) should return 120"
 
 ---
 
-## 6 – Hidden test hints (`show-test-hints: false`)
+## 6 – Let students reason from the requirements
 
-By default, the assertion message is shown when a test fails. Setting
-`#| show-test-hints: false` hides those messages so students cannot infer
-what is being tested.
+You can show whether checks pass without revealing detailed hints. Make sure
+the task itself explains the requirements clearly enough for students to reason
+about their mistakes.
 
 **Task:** Write a function `is_palindrome(s)` that returns `True` if the
 string is a palindrome (ignoring case), `False` otherwise.
@@ -178,35 +175,10 @@ assert is_palindrome("")        == True,  "empty string is a palindrome"
 
 ---
 
-## 7 – Submission export
+## Keep work for a later discussion
 
-The submission header above and the **Export results** button below are
-enabled by setting `submission: true` in the document front matter. Students
-enter their Student ID and Quiz ID, then click the button to get an encoded
-string to submit.
-
-The encoded string can be decoded by the instructor with:
-
-```python
-import json, base64
-
-def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
-    key_bytes = key.encode("utf-8")
-    xored     = base64.b64decode(encoded)
-    raw       = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
-    return json.loads(raw.decode("utf-8"))
-
-data = decode_submission("...", key="demo-key-2026")
-print(data["sid"], data["results"])
-```
-
-## 8 – JSON download
-
-The **Download as JSON** button (in the footer below) saves the current editor
-content and test results of every exercise to a local file — for personal
-documentation. No server is involved.
-
-The download is always available, regardless of whether submission mode is
-enabled.
+Students can download their code and results to revisit an attempt or discuss it
+with a teacher. If your course uses submission codes, explain where students
+should send them. [Submission and download details](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/docs/reference.md#submission-mode).
 
 {{< include examples/_feedback-policies.qmd >}}

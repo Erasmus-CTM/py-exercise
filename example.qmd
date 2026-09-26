@@ -1,5 +1,5 @@
 ---
-title: "py-exercise example"
+title: "Small Python tasks, useful next steps"
 format: html
 filters: [_filters/example-source.lua, py-exercise]
 ai-feedback:
@@ -9,6 +9,14 @@ py-exercise:
   feedback: true
   submission: false
 ---
+
+Complete the price calculation, then explore how different kinds of feedback
+help with debugging and code review. Open the source below an activity to make
+your own version.
+
+**Feedback** prepares a message to paste into an AI chat. If your course has
+feedback set up on the page, you can receive the reply here instead.
+
 
 ## Price including tax
 

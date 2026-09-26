@@ -1,0 +1,85 @@
+# Author your first activity
+
+Start with [the example page](../example.qmd). The extension setup is described
+separately in [Installation and setup](installation.md).
+
+## Give students something to work on
+
+Copy this activity into your Quarto page and adapt its task to your lesson.
+
+````markdown
+```{py-exercise}
+#| label: price-with-tax
+#| task: Complete price_with_tax to return price plus tax. The rate is a decimal.
+def price_with_tax(price, rate):
+    tax = price * rate
+    return price  # TODO: include tax
+
+## TESTS ##
+assert price_with_tax(100, 0.25) == 125
+assert price_with_tax(80, 0) == 80
+```
+````
+
+Code above `## TESTS ##` appears in the editor. The assertions below it check student work. The `task` line tells feedback what the assignment is; keep it consistent with the visible instructions. Include both ordinary cases and cases students might overlook.
+
+## Try it as a student
+
+Make a plausible mistake, then correct it. Does the task give enough information?
+Does the feedback help with the next step? Try a correct response as well as an
+incomplete one. Adjust the instructions until the activity supports the learning
+goal you had in mind.
+
+## Choose the kind of help
+
+A *feedback policy* is a named set of instructions for the help you want to offer.
+For example, you might want a question during practice and a fuller explanation
+afterwards. Put the instructions in a file such as `feedback.yml`:
+
+```yaml
+ai-feedback:
+  policies:
+    gentle-coach:
+      max-words: 120
+      steps:
+        - prompt: Ask one useful question without giving the answer.
+        - prompt: Explain the relevant idea and suggest a next step.
+```
+
+Load it in the page's front matter:
+
+```yaml
+ai-feedback:
+  page-policy-files: feedback.yml
+```
+
+Select it in an exercise with `#| feedback-policy: gentle-coach`.
+Keep the instructions in YAML; the exercise contains only their name. You can
+reuse the same instructions in many activities. Each successful Feedback request
+moves to the next hint, and the final hint repeats. A new Check or Run starts
+the sequence again by default.
+
+## Help feedback stay close to your lesson
+
+Feedback normally uses nearby explanatory text. Put the method or terminology
+you have taught before the activity. For a particular definition or formula,
+you can select a named passage instead. Use `context: none` when the activity
+should stand on its own (on text activities, write `context="none"`). For
+Python exploration, use `feedback-context` to distinguish this from execution
+settings. [Detailed context options](reference.md).
+
+## Let students ask for feedback
+
+With the default **Copy prompt** setting, Feedback prepares a message containing
+the task and current response. Copy it into an AI chat you already use. For a
+reply inside the exercise page, use the AI service arranged for your course;
+the connection details are in the [setup guide](installation.md).
+
+## Compare teaching approaches
+
+The [Python examples](../examples/_feedback-policies.qmd) compare two kinds of
+debugging help and two kinds of code review. Both versions in each pair keep the
+task, starter and tests identical. Adapt the [feedback instructions](../feedback/python-policies.yml)
+to change what the help focuses on, rather than changing the assignment.
+
+[All options](reference.md) · [Project overview](../README.md)
