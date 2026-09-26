@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ai-feedback
-          ref: f5b2e801d63cfea0ab6b6ec9e68108a3663f0c96
+          ref: 9bac4b8c9f4fa1f24ecffd8b6c07218cdd602fcc
           path: _feedback-source
       - run: quarto add ./_feedback-source --no-prompt
       - name: Render standalone example

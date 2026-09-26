@@ -57,4 +57,7 @@ guide starts with the teaching task; setup details are kept separately.
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
+Developed by the **CTM team** for the Erasmus+ project
+**“Computational Thinking makes sense of Mathematics”**
+(**2023-1-NO01-KA220-HED-000166744**).
 [Funding and acknowledgements](docs/acknowledgements.md).
