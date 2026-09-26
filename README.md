@@ -286,12 +286,12 @@ No shared runtime is copied into this plugin. Omitted `context` collects precedi
 section prose; `context: none` opts out; `context: id1,id2` selects tagged
 `.ai-context` blocks reusable by text, math and Pyodide activities.
 `feedback-context` is an alias. See the
-[shared guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/shared-context/README.md)
+[shared guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/README.md)
 for policies, limits, evidence boundaries and settings.
 
 ### Standalone example
 
-`example.qmd` demonstrates this package with shared feedback. Install `Erasmus-CTM/ai-feedback@feature/shared-context`, then run `quarto render example.qmd`. No other integration extension is required. The example builds automatically on pushes and pull requests; download the `standalone-example` Actions artifact. Feedback defaults to copy mode, which needs no API key.
+`example.qmd` demonstrates this package with shared feedback. Install `Erasmus-CTM/ai-feedback@feature/scoped-policies`, then run `quarto render example.qmd`. No other integration extension is required. The example builds automatically on pushes and pull requests; download the `standalone-example` Actions artifact. Feedback defaults to copy mode, which needs no API key.
 
 ### Page and exercise feedback policies
 
