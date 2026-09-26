@@ -309,8 +309,8 @@ inherit; `steps` replaces the entire list and `steps: []` disables progression.
 See [the shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
 During preview, install `Erasmus-CTM/ai-feedback@feature/scoped-policies`.
 
-The [standalone example](../example.qmd#feedback-policy-examples) and
-[feature overview](../example-en.qmd#feedback-policy-examples) include two policy
+The [standalone example — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/example.qmd) and
+[feature overview — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/example-en.qmd) include two policy
 comparisons: progressive debugging hints versus a worked correction, and
 correctness review versus readability review of passing code. Each pair keeps
 its task, starter and tests identical. Policies are defined in
