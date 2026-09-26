@@ -1,7 +1,7 @@
 ---
 title: "py-exercise example"
 format: html
-filters: [py-exercise]
+filters: [_filters/example-source.lua, py-exercise]
 ai-feedback:
   mode: copy
 py-exercise:

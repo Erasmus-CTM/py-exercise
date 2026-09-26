@@ -13,12 +13,16 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ai-feedback
-          ref: 1712490164f83db1093e46856a5a0c0bae61420b
+          ref: f5b2e801d63cfea0ab6b6ec9e68108a3663f0c96
           path: _feedback-source
       - run: quarto add ./_feedback-source --no-prompt
       - name: Render standalone example
         run: |
           quarto render example.qmd
+          quarto render example-en.qmd
+          quarto render example-mini.qmd
+          test -f example-en.html
+          test -f example-mini.html
           test -f example.html || test -f _site/example.html
       - uses: actions/upload-artifact@v4
         with:
@@ -26,4 +30,6 @@ jobs:
           path: |
             example.html
             example_files
+            example-en.html
+            example-mini.html
             _site

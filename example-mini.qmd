@@ -4,6 +4,7 @@ format:
   html:
     embed-resources: true
 filters:
+  - _filters/example-source.lua
   - py-exercise
 ---
 
