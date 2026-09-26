@@ -1,0 +1,29 @@
+name: Build standalone example
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  example:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - uses: actions/checkout@v4
+        with:
+          repository: Erasmus-CTM/ai-feedback
+          ref: ac7817733b7bc7ce729537e8fb539efe83c339d9
+          path: _feedback-source
+      - run: quarto add ./_feedback-source --no-prompt
+      - name: Render standalone example
+        run: |
+          quarto render example.qmd
+          test -f example.html || test -f _site/example.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-example
+          path: |
+            example.html
+            example_files
+            _site

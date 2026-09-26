@@ -1,0 +1,28 @@
+---
+title: "py-exercise example"
+format: html
+filters: [py-exercise]
+ai-feedback:
+  mode: copy
+py-exercise:
+  feedback: true
+  submission: false
+---
+
+## Price including tax
+
+Complete the return value so that the function includes the tax.
+
+```{py-exercise}
+#| label: price
+#| task: Complete price_with_tax to return the price including tax. The rate is a decimal.
+def price_with_tax(price, rate):
+    tax = price * rate
+    return price  # TODO: include tax
+
+## TESTS ##
+assert price_with_tax(100, 0.25) == 125
+assert price_with_tax(80, 0) == 80
+```
+
+Choose Check to run the tests, then Feedback for guidance.
