@@ -281,7 +281,7 @@ See the [shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/ma
 ## Shared dependency and learning context
 
 Install ai-feedback once in the project; `py-exercise: feedback: true` loads it
-automatically. This branch requires the ai-feedback integration preview 0.5.0.
+automatically. This branch requires the ai-feedback integration preview 0.6.0.
 No shared runtime is copied into this plugin. Omitted `context` collects preceding
 section prose; `context: none` opts out; `context: id1,id2` selects tagged
 `.ai-context` blocks reusable by text, math and Pyodide activities.
@@ -308,3 +308,12 @@ an explicit named selection takes precedence over that entry. Omitted settings
 inherit; `steps` replaces the entire list and `steps: []` disables progression.
 See [the shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
 During preview, install `Erasmus-CTM/ai-feedback@feature/scoped-policies`.
+
+The [standalone example](example.qmd#feedback-policy-examples) and
+[feature overview](example-en.qmd#feedback-policy-examples) include two policy
+comparisons: progressive debugging hints versus a worked correction, and
+correctness review versus readability review of passing code. Each pair keeps
+its task, starter and tests identical. Policies are defined in
+[feedback/python-policies.yml](feedback/python-policies.yml); collapsed panels
+show the exercise source and YAML. Download the `standalone-example` GitHub
+Actions artifact to try the rendered pages.

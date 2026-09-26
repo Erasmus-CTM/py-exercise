@@ -3,6 +3,7 @@ title: "py-exercise example"
 format: html
 filters: [_filters/example-source.lua, py-exercise]
 ai-feedback:
+  page-policy-files: feedback/python-policies.yml
   mode: copy
 py-exercise:
   feedback: true
@@ -26,3 +27,5 @@ assert price_with_tax(80, 0) == 80
 ```
 
 Choose Check to run the tests, then Feedback for guidance.
+
+{{< include examples/_feedback-policies.qmd >}}

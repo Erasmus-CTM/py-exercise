@@ -1,0 +1,125 @@
+## Different feedback for different learning goals {#feedback-policy-examples}
+
+::: {.callout-note .example-author-notes .ai-feedback-ignore}
+### For course authors
+
+Each pair below uses identical task text, starter code and tests. Only the
+named `feedback-policy` changes. The definitions live in
+`feedback/python-policies.yml`, loaded by this page's `ai-feedback.page-policy-files`.
+Open **Show source and policy YAML** immediately after an example to see both.
+
+Press **Check**, then **Feedback**. In copy mode, compare the generated prompts;
+with a configured API, compare the responses (wording depends on the model).
+Feedback does not run Python. A new Check resets the hint sequence by default.
+:::
+
+### Debugging: guided practice versus a worked review
+
+::: {.example-author-notes .ai-feedback-ignore}
+The first policy preserves the learner's opportunity to find the bug. Click
+Feedback twice without another Check to move from a tracing question to a more
+explicit explanation. The second policy suits reviewing an already attempted
+exercise: it permits a complete correction immediately.
+:::
+
+#### A — Help me find the bug
+
+Complete total(values) to return the sum of all numbers using the loop. Do not use sum(). An empty list returns 0.
+
+```{py-exercise}
+#| label: debug-guided
+#| feedback-policy: debug-coach
+#| feedback-context: none
+#| task: Complete total(values) to return the sum of all numbers using the loop. Do not use sum(). An empty list returns 0.
+#| forbidden-keywords: sum
+def total(values):
+    result = 0
+    for value in values:
+        result = value  # TODO: keep the running total
+    return result
+
+## TESTS ##
+assert total([4, 7, 2]) == 13, "Add all three values"
+assert total([-2, 5]) == 3, "Include negative values"
+assert total([8]) == 8
+assert total([]) == 0
+```
+
+#### B — Explain the correction
+
+Complete total(values) to return the sum of all numbers using the loop. Do not use sum(). An empty list returns 0.
+
+```{py-exercise}
+#| label: debug-worked
+#| feedback-policy: debug-walkthrough
+#| feedback-context: none
+#| task: Complete total(values) to return the sum of all numbers using the loop. Do not use sum(). An empty list returns 0.
+#| forbidden-keywords: sum
+def total(values):
+    result = 0
+    for value in values:
+        result = value  # TODO: keep the running total
+    return result
+
+## TESTS ##
+assert total([4, 7, 2]) == 13, "Add all three values"
+assert total([-2, 5]) == 3, "Include negative values"
+assert total([8]) == 8
+assert total([]) == 0
+```
+
+### Review: correctness versus readability
+
+::: {.example-author-notes .ai-feedback-ignore}
+These starters already pass the supplied tests. This is a review exercise,
+not a request to find a nonexistent bug. One policy concentrates on behavioral
+requirements and boundary cases; the other helps a beginner improve readable,
+working code without turning the feedback into a full rewrite.
+:::
+
+#### A — Does it meet the requirements?
+
+Review total_nonnegative(values), which should return the sum of values greater than or equal to zero. Negative values are ignored; an empty list returns 0. Preserve this behavior if you edit the code.
+
+```{py-exercise}
+#| label: review-correctness
+#| feedback-policy: correctness-review
+#| feedback-context: none
+#| task: Review total_nonnegative(values), which should return the sum of values greater than or equal to zero. Negative values are ignored; an empty list returns 0. Preserve this behavior if you edit the code.
+def total_nonnegative(values):
+    s = 0
+    for i in range(len(values)):
+        if values[i] >= 0:
+            s = s + values[i]
+    return s  # TODO: review behavior and clarity
+
+## TESTS ##
+assert total_nonnegative([4, -7, 2]) == 6
+assert total_nonnegative([-3, -1]) == 0
+assert total_nonnegative([0, 5]) == 5
+assert total_nonnegative([]) == 0
+```
+
+#### B — How could it be easier to read?
+
+Review total_nonnegative(values), which should return the sum of values greater than or equal to zero. Negative values are ignored; an empty list returns 0. Preserve this behavior if you edit the code.
+
+```{py-exercise}
+#| label: review-readability
+#| feedback-policy: readability-review
+#| feedback-context: none
+#| task: Review total_nonnegative(values), which should return the sum of values greater than or equal to zero. Negative values are ignored; an empty list returns 0. Preserve this behavior if you edit the code.
+def total_nonnegative(values):
+    s = 0
+    for i in range(len(values)):
+        if values[i] >= 0:
+            s = s + values[i]
+    return s  # TODO: review behavior and clarity
+
+## TESTS ##
+assert total_nonnegative([4, -7, 2]) == 6
+assert total_nonnegative([-3, -1]) == 0
+assert total_nonnegative([0, 5]) == 5
+assert total_nonnegative([]) == 0
+```
+
