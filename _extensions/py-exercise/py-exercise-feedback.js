@@ -23,7 +23,7 @@
     options.buttonBar.append(button, F.settingsButton(options.uiLanguage));
     options.container.append(output);
     const adapter = F.attach({
-      integration: 'py-exercise', id: 'py-exercise-' + options.label,
+      integration: 'py-exercise', policySelection: options.policySelection, id: 'py-exercise-' + options.label,
       button, output, uiLanguage: options.uiLanguage,
       getRequest: () => {
         const code = options.getCode();

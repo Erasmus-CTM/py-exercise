@@ -283,6 +283,7 @@ local function CodeBlock(el)
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
     task              = opts["task"],
+    policySelection   = feedback and feedback.selection(el, opts) or nil,
     feedbackContext   = feedback and feedback.context(el, opts) or nil,
     feedbackLanguage  = opts["feedback-language"] or lang,
     learnerLevel      = opts["learner-level"] or "",

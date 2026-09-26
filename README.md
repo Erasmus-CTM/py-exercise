@@ -292,3 +292,19 @@ for policies, limits, evidence boundaries and settings.
 ### Standalone example
 
 `example.qmd` demonstrates this package with shared feedback. Install `Erasmus-CTM/ai-feedback@feature/shared-context`, then run `quarto render example.qmd`. No other integration extension is required. The example builds automatically on pushes and pull requests; download the `standalone-example` Actions artifact. Feedback defaults to copy mode, which needs no API key.
+
+### Page and exercise feedback policies
+
+With ai-feedback 0.6.0, put all new teaching policy definitions in YAML files.
+Project `ai-feedback.policy-files` loads common policies; page front matter can
+load `ai-feedback.page-policy-files`. Both accept one path or an ordered list,
+relative to the project root. Page settings override project settings.
+
+In a cell, `#| feedback-policy: short-hints` selects an existing entry from the
+YAML file's `ai-feedback.policies` mapping. Inline prompt/step mappings are not
+accepted. The same named policy can be reused in every integration. YAML
+`ai-feedback.exercises.<integration>.<label>` targets a specific authored label;
+an explicit named selection takes precedence over that entry. Omitted settings
+inherit; `steps` replaces the entire list and `steps: []` disables progression.
+See [the shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/scoped-policies/docs/feedback-policies.md).
+During preview, install `Erasmus-CTM/ai-feedback@feature/scoped-policies`.

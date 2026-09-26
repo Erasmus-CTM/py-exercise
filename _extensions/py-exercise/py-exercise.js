@@ -452,7 +452,7 @@
           container: container, buttonBar: buttonBar, label: label,
           uiLanguage: submissionConfig.lang || 'en',
           feedbackLanguage: exerciseData.feedbackLanguage || submissionConfig.lang || 'en',
-          learnerLevel: exerciseData.learnerLevel || '', task: exerciseData.task, feedbackContext: exerciseData.feedbackContext,
+          learnerLevel: exerciseData.learnerLevel || '', task: exerciseData.task, feedbackContext: exerciseData.feedbackContext, policySelection: exerciseData.policySelection,
           forbiddenImports: forbiddenImports, forbiddenKeywords: forbiddenKeywords,
           getCode: function () { return editor.getValue(); },
           getAssessment: function () { return assessment; }
