@@ -482,6 +482,7 @@
 
     async function runCheck() {
       if (!editor) return;
+      feedbackAdapter?.reset('run');
       clearFeedback();
 
       resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
@@ -532,6 +533,7 @@
     checkBtn.onclick = runCheck;
     resetBtn.onclick = function () {
       clearFeedback();
+      feedbackAdapter?.reset();
       if (editor) editor.setValue(starterCode);
       try { localStorage.removeItem(storageKey); } catch (e) {}
       resultArea.innerHTML = '';

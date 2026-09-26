@@ -3,7 +3,15 @@
   'use strict';
   function attach(options) {
     const F = root.AIFeedback;
-    if (!F?.attach) throw new Error('Python feedback requires the ai-feedback Quarto filter.');
+    if (!F?.applyPolicy) {
+      const disabled = document.createElement('button');
+      disabled.type = 'button'; disabled.className = 'btn btn-light py-exercise-feedback';
+      disabled.textContent = 'Feedback'; disabled.disabled = true; options.buttonBar.append(disabled);
+      const notice = document.createElement('div'); notice.className = 'py-exercise-feedback-output';
+      notice.textContent = 'Python feedback requires ai-feedback 0.4.0 or later. Update the extension and render again. Check remains available.';
+      options.container.append(notice);
+      return {invalidate() {}, reset() {}, dispose() {notice.remove(); disabled.remove();}};
+    }
     const locale = F.locales[options.uiLanguage] || F.locales.en;
     const button = document.createElement('button');
     button.type = 'button';
@@ -15,7 +23,7 @@
     options.buttonBar.append(button, F.settingsButton(options.uiLanguage));
     options.container.append(output);
     const adapter = F.attach({
-      id: 'py-exercise-' + options.label,
+      integration: 'py-exercise', id: 'py-exercise-' + options.label,
       button, output, uiLanguage: options.uiLanguage,
       getRequest: () => {
         const code = options.getCode();
@@ -29,8 +37,7 @@
           if (result.status === 'checked') evidence.push({label: 'Checks passed', text: result.passed + ' of ' + result.total});
           if (result.stdout) evidence.push({label: 'Learner code output', text: result.stdout});
         }
-        const criteria = ['Respect the assignment and its restrictions. Give focused guidance without a finished solution.',
-          'Feedback does not run code. Use supplied checker evidence only; do not claim untested code has passed.'];
+        const criteria = [];
         if (options.forbiddenImports.length) criteria.push('Do not import: ' + options.forbiddenImports.join(', ') + '.');
         if (options.forbiddenKeywords.length) criteria.push('Do not use: ' + options.forbiddenKeywords.join(', ') + '.');
         return {
@@ -42,7 +49,8 @@
       }
     });
     return {
-      invalidate() { adapter.cancel(); output.replaceChildren(); },
+      invalidate() { adapter.cancel({clearOutput: true}); },
+      reset(reason) { adapter.reset(reason); },
       dispose() { adapter.dispose(); }
     };
   }
