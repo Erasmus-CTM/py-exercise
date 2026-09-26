@@ -1,3 +1,4 @@
+local feedback = nil
 ----
 -- py-exercise.lua
 --
@@ -282,6 +283,7 @@ local function CodeBlock(el)
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
     task              = opts["task"],
+    feedbackContext   = feedback and feedback.context(el, opts) or nil,
     feedbackLanguage  = opts["feedback-language"] or lang,
     learnerLevel      = opts["learner-level"] or "",
   }
@@ -305,5 +307,19 @@ end
 
 return {
   { Meta = Meta },
+  { Callout = function(c)
+      if feedbackEnabled and quarto.doc.is_format("html") then
+        feedback = feedback or dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+        return feedback.markCallout(c)
+      end
+      return c
+    end },
+  { Pandoc = function(doc)
+      if feedbackEnabled and quarto.doc.is_format("html") then
+        feedback = dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+        return feedback.prepare(doc)
+      end
+      return doc
+    end },
   { CodeBlock = CodeBlock },
 }

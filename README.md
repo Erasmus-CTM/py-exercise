@@ -277,3 +277,14 @@ mode. Run/Check resets progression by default; set `reset-on-run: false` to keep
 Explicit Reset always restarts at step one.
 
 See the [shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
+
+## Shared dependency and learning context
+
+Install ai-feedback once in the project; `py-exercise: feedback: true` loads it
+automatically. This branch requires the ai-feedback integration preview 0.5.0.
+No shared runtime is copied into this plugin. Omitted `context` collects preceding
+section prose; `context: none` opts out; `context: id1,id2` selects tagged
+`.ai-context` blocks reusable by text, math and Pyodide activities.
+`feedback-context` is an alias. See the
+[shared guide](https://github.com/Erasmus-CTM/ai-feedback/blob/feature/layered-feedback/README.md)
+for policies, limits, evidence boundaries and settings.
