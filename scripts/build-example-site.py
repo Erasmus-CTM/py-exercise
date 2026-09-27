@@ -24,5 +24,5 @@ for name in ['example.html', 'example-en.html', 'example-mini.html']:
 <ul><li><a href="example.html">Python examples and feedback comparisons</a>: debugging hints, worked corrections and code reviews.</li>
 <li><a href="example-en.html">Build a short Python practice session</a>: a larger collection of teaching ideas.</li>
 <li><a href="example-mini.html">Your first Python practice task</a>: start with one small function.</li></ul>
-<p><a href="https://github.com/Erasmus-CTM/py-exercise">Authoring guides and editable examples</a></p>
+<p><a href="https://github.com/Erasmus-CTM/py-exercise/tree/feature/shared-feedback-integration">Authoring guides and editable examples</a></p>
 </main></body></html>''')
