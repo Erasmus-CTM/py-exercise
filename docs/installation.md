@@ -35,3 +35,12 @@ py-exercise:
 ```
 
 Add a `#| task:` line to each exercise so feedback knows what students are being asked to do.
+
+## Published examples
+
+[Standalone activities](https://erasmus-ctm.github.io/py-exercise/example.html),
+[full practice session](https://erasmus-ctm.github.io/py-exercise/example-en.html),
+and [minimal example](https://erasmus-ctm.github.io/py-exercise/example-mini.html)
+are built and published by GitHub Actions. During the integration preview the
+publisher uses `feature/shared-feedback-integration`; it does not require merging
+the consumer implementation into main.

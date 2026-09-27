@@ -1,6 +1,6 @@
 # Download an example to edit
 
-To try the activity first, [open the rendered examples](https://erasmus-ctm.github.io/ctm-assessment/example.html). Choose the **Python** tab.
+To try the activity first, [open the rendered examples](https://erasmus-ctm.github.io/py-exercise/example.html). 
 
 [Example source — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/example.qmd).
 On GitHub, select **Download raw file**. Open the saved file in your editor;

@@ -2,13 +2,13 @@
 
 Turn a Quarto page into a place to practise programming. Students edit a function, press **Check**, and see which checks pass. You provide a useful starting point and choose examples that reveal common mistakes. Optional AI feedback helps them take the next step.
 
-[Try the Python activities](https://erasmus-ctm.github.io/ctm-assessment/example.html) · [Authoring guide](docs/authoring.md)
+[Try the Python activities](https://erasmus-ctm.github.io/py-exercise/example.html) · [Full practice session](https://erasmus-ctm.github.io/py-exercise/example-en.html) · [Authoring guide](docs/authoring.md)
 
 ## Try it, then make it yours
 
-Choose the **Python** tab.
 
-Try the unfinished price calculation on the rendered page. The downloadable Python examples below also compare debugging questions, worked corrections, correctness reviews and readability reviews on the same code.
+
+Try the unfinished price calculation, then compare debugging questions, worked corrections, correctness reviews and readability reviews on the same code.
 
 Start with one function and one clear learning goal. Leave a meaningful gap in the starter, then add checks for an ordinary input and an important boundary case.
 

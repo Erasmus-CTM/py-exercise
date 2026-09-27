@@ -1,6 +1,6 @@
 # Author your first activity
 
-Start with [the rendered examples](https://erasmus-ctm.github.io/ctm-assessment/example.html). Choose the **Python** tab. The extension setup is described
+Start with [the rendered examples](https://erasmus-ctm.github.io/py-exercise/example.html).  The extension setup is described
 separately in [Installation and setup](installation.md).
 
 [Example source — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/feature/shared-feedback-integration/example.qmd).
