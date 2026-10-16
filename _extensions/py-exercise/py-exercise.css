@@ -27,8 +27,15 @@
 /* Button bar */
 .py-exercise-buttons {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
+}
+
+.py-exercise-buttons > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .py-exercise-check,
@@ -326,4 +333,3 @@
   color: #333;
   cursor: pointer;
 }
-
