@@ -16,6 +16,8 @@ jobs:
           ref: 9bac4b8c9f4fa1f24ecffd8b6c07218cdd602fcc
           path: _feedback-source
       - run: quarto add ./_feedback-source --no-prompt
+      - name: Test the published example requirements
+        run: python -m unittest discover -s tests
       - name: Render standalone example
         run: |
           quarto render example.qmd

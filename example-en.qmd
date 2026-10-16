@@ -85,6 +85,10 @@ def greet(name):
 ## TESTS ##
 assert greet("World") == "Hello, World!", "greet('World') should return 'Hello, World!'"
 assert greet("Alice") == "Hello, Alice!", "greet('Alice') should return 'Hello, Alice!'"
+with __import__("contextlib").redirect_stdout(__import__("io").StringIO()) as output:
+    returned = greet("Mia")
+    assert returned == "Hello, Mia!", "Return the greeting"
+    assert output.getvalue() == "Hello, Mia!\n", "Print exactly one greeting line"
 ```
 
 ---
