@@ -1,12 +1,16 @@
 ---
-title: "py-exercise – Mini example"
+title: "Your first Python practice task"
 format:
   html:
     embed-resources: true
 filters:
+  - _filters/example-source.lua
   - py-exercise
 ---
 
+
+Try completing this function, then choose **Check**. Open the source below it
+to change the question and checks for your own students.
 
 **Task:** Write a function `add(a, b)` that returns the sum of two numbers.
 

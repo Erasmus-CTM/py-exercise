@@ -3,10 +3,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: [Build standalone example]
-    types: [completed]
-    branches: [feature/shared-feedback-integration]
 permissions:
   contents: read
 concurrency:
@@ -14,22 +10,20 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
-    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Publish the accepted preview without merging the consumer refactor.
-          ref: ${{ github.event.workflow_run.head_sha || 'feature/shared-feedback-integration' }}
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ai-feedback
-          ref: 90f46a66104dfd0a2ce30030cbc3a00e4f1ce6de
+          ref: bf23e36028c0bfcff6038874e10b109558437b1b
           path: _feedback-source
       - run: quarto add ./_feedback-source --no-prompt
+      - name: Test the published example requirements
+        run: python -m unittest discover -s tests
       - name: Build the standalone pages
         run: python scripts/build-example-site.py
       - uses: actions/upload-pages-artifact@v3

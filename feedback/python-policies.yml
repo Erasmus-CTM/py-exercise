@@ -1,0 +1,40 @@
+ai-feedback:
+  policies:
+    debug-coach:
+      max-words: 120
+      reset-on-run: true
+      steps:
+        - prompt: >-
+            Ask one question that helps the learner trace the accumulator through
+            the first two loop iterations. Do not identify the faulty line or
+            give replacement code yet.
+        - prompt: >-
+            Explain the difference between accumulating values and replacing the
+            running total, using a short trace of the learner's code. Suggest
+            the next edit in words without providing the complete function.
+    debug-walkthrough:
+      max-words: 220
+      steps:
+        - prompt: >-
+            Explain why the running total is lost, show a corrected complete
+            function, and trace it on [4, 7, 2]. Explain why the empty list must
+            return zero. This is a worked review after an attempted solution.
+          allow-full-solution: true
+    correctness-review:
+      max-words: 140
+      steps:
+        - prompt: >-
+            Review only whether the function meets the task. Consider mixed
+            positive and negative values, all-negative values, zero and the
+            empty list. Distinguish observed test results from reasoning about
+            cases. If correct, say so; do not invent a bug or suggest stylistic
+            rewrites. Passing supplied tests is evidence, not a general proof.
+    readability-review:
+      max-words: 160
+      steps:
+        - prompt: >-
+            Give a beginner code review focused on clearer variable names and
+            iterating directly over values instead of indexing. Identify at
+            most two improvements and explain why they help. If behavior is
+            correct, acknowledge that before discussing readability. Do not
+            present style choices as test failures or rewrite the whole function.
