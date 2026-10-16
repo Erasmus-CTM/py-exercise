@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ai-feedback
-          ref: bf23e36028c0bfcff6038874e10b109558437b1b
+          ref: main
           path: _feedback-source
       - run: quarto add ./_feedback-source --no-prompt
       - name: Test the published example requirements
