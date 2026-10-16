@@ -267,20 +267,14 @@ Cross-integration examples and acceptance tests live in
 
 ## Configurable shared teaching policies
 
-With ai-feedback 0.4.0, use `ai-feedback.policy-files` in Quarto metadata to
-load one YAML file or an ordered list. Each file defines `ai-feedback.defaults`
-and/or `ai-feedback.integrations` with this integration’s name. Configure `prompt`,
-`steps`, `language`, `max-words`, `max-issues`, `allow-full-solution` and
-`reset-on-run`. Later step lists replace earlier lists; `steps: []` selects review
-mode. Run/Check resets progression by default; set `reset-on-run: false` to keep it.
-Explicit Reset always restarts at step one.
-
-See the [shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
+AI Feedback 0.8 uses explicit `page-policy`/`project-policy` selection,
+`base-prompt`, `step-prompt` and named `extends` inheritance. Loading policy files
+only registers definitions. See the [shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
 
 ## Shared dependency and learning context
 
 Install ai-feedback once in the project; `py-exercise: feedback: true` loads it
-automatically. Shared feedback requires ai-feedback 0.6.0 or later.
+automatically. Shared feedback requires ai-feedback 0.8.0 or later.
 No shared runtime is copied into this plugin. Omitted `context` collects preceding
 section prose; `context: none` opts out; `context: id1,id2` selects tagged
 `.ai-context` blocks reusable by text, math and Pyodide activities.
@@ -294,25 +288,12 @@ for policies, limits, evidence boundaries and settings.
 
 ### Page and exercise feedback policies
 
-With ai-feedback 0.6.0, put all new teaching policy definitions in YAML files.
-Project `ai-feedback.policy-files` loads common policies; page front matter can
-load `ai-feedback.page-policy-files`. Both accept one path or an ordered list,
-relative to the project root. Page settings override project settings.
+Put teaching policy definitions in YAML files and activate them explicitly with
+`project-policy`, `page-policy` or a cell's `#| feedback-policy: name`. A policy
+file registers definitions; `page-policy-files` alone does not change page
+behavior. The same named policy can be reused across integrations.
 
-In a cell, `#| feedback-policy: short-hints` selects an existing entry from the
-YAML file's `ai-feedback.policies` mapping. Inline prompt/step mappings are not
-accepted. The same named policy can be reused in every integration. YAML
-`ai-feedback.exercises.<integration>.<label>` targets a specific authored label;
+YAML `ai-feedback.exercises.<integration>.<label>` targets one authored label;
 an explicit named selection takes precedence over that entry. Omitted settings
-inherit; `steps` replaces the entire list and `steps: []` disables progression.
-See [the shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
-Install it with `quarto add Erasmus-CTM/ai-feedback`.
-
-The [standalone example — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/main/example.qmd) and
-[feature overview — download and open in your editor](https://github.com/Erasmus-CTM/py-exercise/blob/main/example-en.qmd) include two policy
-comparisons: progressive debugging hints versus a worked correction, and
-correctness review versus readability review of passing code. Each pair keeps
-its task, starter and tests identical. Policies are defined in
-[feedback/python-policies.yml](../feedback/python-policies.yml); collapsed panels
-show the exercise source and YAML. Download the `standalone-example` GitHub
-Actions artifact to try the rendered pages.
+inherit; `steps` replaces the entire list. See the
+[shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
