@@ -56,19 +56,35 @@
     });
   }
 
+  // Waits for Python at most LOAD_TIMEOUT: a load that never finishes ends
+  // with an error a later attempt can retry, instead of waiting forever.
+  function withLoadLimit(promise) {
+    if (typeof setTimeout !== 'function') return Promise.resolve(promise);
+    var timer;
+    var timeout = new Promise(function (resolve, reject) {
+      timer = setTimeout(function () {
+        var error = new Error('Python did not finish loading within ' + LOAD_TIMEOUT / 1000 + ' s');
+        error.code = 'pyodide-timeout';
+        reject(error);
+      }, LOAD_TIMEOUT);
+    });
+    return Promise.race([Promise.resolve(promise), timeout]).finally(function () { clearTimeout(timer); });
+  }
+
   async function ensurePyodide() {
     // Some Quarto integrations declare these with top-level `let`, which is
     // visible to classic scripts but is not a property of globalThis.
     var coatless = typeof qpyodideInstance !== 'undefined'
       ? qpyodideInstance : root.qpyodideInstance;
     if (typeof coatless !== 'undefined') {
-      root.mainPyodide = await coatless;
+      // pyodide-interaktiv's worker may still be starting.
+      root.mainPyodide = await withLoadLimit(coatless);
       return root.mainPyodide;
     }
     var existing = typeof mainPyodide !== 'undefined'
       ? mainPyodide : root.mainPyodide;
     if (typeof existing !== 'undefined') {
-      root.mainPyodide = await existing;
+      root.mainPyodide = await withLoadLimit(existing);
       return root.mainPyodide;
     }
 
@@ -79,19 +95,7 @@
         await loadScript(indexURL + 'pyodide.js');
         // A failed WebAssembly download leaves loadPyodide() pending forever;
         // give up after LOAD_TIMEOUT so that a later attempt can start again.
-        var loading = root.loadPyodide({ indexURL: indexURL });
-        if (typeof setTimeout !== 'function') return loading;
-        var timer;
-        var timeout = new Promise(function (resolve, reject) {
-          timer = setTimeout(function () {
-            var error = new Error('Python did not finish loading within ' + LOAD_TIMEOUT / 1000 + ' s');
-            error.code = 'pyodide-timeout';
-            reject(error);
-          }, LOAD_TIMEOUT);
-        });
-        try {
-          return await Promise.race([loading, timeout]);
-        } finally { clearTimeout(timer); }
+        return withLoadLimit(root.loadPyodide({ indexURL: indexURL }));
       })();
     }
     var pending = root.__qExercisePyodide;

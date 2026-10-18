@@ -17,6 +17,7 @@
       editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
       pythonUnavailable:    'Python could not be loaded (no connection to cdn.jsdelivr.net?). Check the connection and press Check again.',
       slowCheck:            'Still running – an endless loop?',
+      slowLoad:             'Python is still loading.',
       stop:                 'Stop',
       stopped:              'Stopped. Python was restarted (interactive cells on this page lost their variables).',
       stdoutLabel:          'Output:',
@@ -64,6 +65,7 @@
       editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
       pythonUnavailable:    'Python konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Prüfe die Verbindung und klicke erneut auf Überprüfen.',
       slowCheck:            'Läuft noch – eine Endlosschleife?',
+      slowLoad:             'Python wird noch geladen.',
       stop:                 'Abbrechen',
       stopped:              'Abgebrochen. Python wurde neu gestartet (interaktive Zellen auf dieser Seite haben ihre Variablen verloren).',
       stdoutLabel:          'Ausgabe:',
@@ -513,7 +515,7 @@
             (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
             var note = resultArea.querySelector('.py-exercise-running');
             if (!note) return;
-            note.textContent = L.slowCheck + ' ';
+            note.textContent = (ms ? L.slowLoad || L.slowCheck : L.slowCheck) + ' ';   // ms: the load limit
             var stopBtn = document.createElement('button');
             stopBtn.type = 'button';
             stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
