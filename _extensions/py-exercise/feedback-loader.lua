@@ -33,12 +33,12 @@ end
 local function sharedFeedback()
   -- An ai-feedback installed next to this extension (the CTM Assessment
   -- umbrella, or one owner folder) belongs to the same set and wins, so the
-  -- umbrella and separately added copies of the same version coexist.
+  -- umbrella and separately added copies coexist, also in other versions.
   local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)[/\\][^/\\]+[/\\][^/\\]+$")
   local sibling = here and pandoc.path.join({here, "ai-feedback", "feedback-quarto.lua"})
   local file = sibling and io.open(sibling, "r")
   if file then file:close() else sibling = nil end
-  local found = installations()
+  local found = sibling and {} or installations()
   local chosen = sibling or found[1]
   assert(chosen, "AI feedback requires the shared extension. Run: quarto add Erasmus-CTM/ai-feedback")
   for _, path in ipairs(found) do
@@ -47,9 +47,16 @@ local function sharedFeedback()
         .. ") and " .. path .. " (" .. version(path) .. "). Keep one version.")
     end
   end
-  if not sibling then
-    assert(#found <= 1, "Multiple ai-feedback installations found; keep one project installation.")
+  assert(#found <= 1, "Multiple ai-feedback installations found; keep one project installation.")
+  -- One page can still combine filters from different installations; they
+  -- must then agree on the ai-feedback version (filters share Lua globals).
+  local loaded = _G.__ctmAiFeedbackInstallation
+  if loaded and pandoc.path.normalize(loaded.path) ~= pandoc.path.normalize(chosen) and loaded.version ~= version(chosen) then
+    assert(false, "This page combines filters that use different ai-feedback versions: " .. loaded.path .. " ("
+      .. loaded.version .. ") and " .. chosen .. " (" .. version(chosen) .. "). List the filters of one installation "
+      .. "(for example only ctm-assessment), or install the same ai-feedback version.")
   end
+  _G.__ctmAiFeedbackInstallation = loaded or {path = chosen, version = version(chosen)}
   local shared = dofile(chosen)
   assert(shared.selection, "Scoped feedback policies require ai-feedback 0.6.0 or later (found " .. chosen
     .. "). Run: quarto add Erasmus-CTM/ai-feedback")

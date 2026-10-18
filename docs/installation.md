@@ -25,6 +25,10 @@ is ready and the first **Check** waits for Python.
 | Feedback (`py-exercise: feedback: true`) | `quarto add Erasmus-CTM/ai-feedback` | Rendering stops with a message naming this command. Without `feedback: true` it is not needed. |
 | Shared runtime with interactive Pyodide cells | [pyodide-interaktiv](https://github.com/Erasmus-CTM/pyodide-interaktiv) | py-exercise loads its own Pyodide. With pyodide-interaktiv on the page it reuses that runtime. |
 
+Invalid exercise source stops rendering with a message, for example an
+exercise without `#| task:` while feedback is on. Before 0.3.0 these messages
+were printed but the render continued and published a broken exercise.
+
 ---
 
 

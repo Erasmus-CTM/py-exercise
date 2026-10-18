@@ -178,7 +178,8 @@ local function ensureExerciseSetup()
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
 
   -- JS
-  local js = (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
+  local js = readFile("shared/pyodide-runtime.js") .. "\n"
+    .. (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
   quarto.doc.include_text("after-body",
     "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
 end

@@ -15,6 +15,7 @@
       errorHeader:          '❌ Error in code:',
       unexpectedError:      '❌ Unexpected error:',
       editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
+      pythonUnavailable:    'Python could not be loaded (no connection to cdn.jsdelivr.net?). Check the connection and press Check again.',
       stdoutLabel:          'Output:',
       allPassed: function (n) {
         return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
@@ -58,6 +59,7 @@
       errorHeader:          '❌ Fehler im Code:',
       unexpectedError:      '❌ Unerwarteter Fehler:',
       editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
+      pythonUnavailable:    'Python konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Prüfe die Verbindung und klicke erneut auf Überprüfen.',
       stdoutLabel:          'Ausgabe:',
       allPassed: function (n) {
         return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
@@ -98,60 +100,14 @@
   // Utilities
   // ---------------------------------------------------------------------------
 
-  // Laedt ein Skript genau einmal. Ist der Tag schon da, aber noch nicht
-  // fertig geladen, wird auf dessen load-Event gewartet - NICHT sofort
-  // aufgeloest. Sonst greift eine zweite Extension auf globals zu, die es
-  // noch gar nicht gibt.
-  function loadScript(src) {
-    return new Promise(function (resolve, reject) {
-      var existing = document.querySelector('script[src="' + src + '"]');
-      if (existing) {
-        if (existing.dataset.qLoaded === '1') { resolve(); return; }
-        existing.addEventListener('load', function () { resolve(); });
-        existing.addEventListener('error', function () {
-          reject(new Error('Failed to load: ' + src));
-        });
-        return;
-      }
-      var s = document.createElement('script');
-      s.src = src;
-      s.onload = function () { s.dataset.qLoaded = '1'; resolve(); };
-      s.onerror = function () { reject(new Error('Failed to load: ' + src)); };
-      document.head.appendChild(s);
-    });
-  }
-
-  // Resolves to the current Pyodide runtime. A Pyodide extension on the page
-  // may replace its runtime (pyodide-interaktiv's Stop/restart), so callers
-  // ask again for every run instead of caching it.
-  async function ensurePyodide() {
-    // pyodide-interaktiv (or coatless-quarto/pyodide) owns the runtime.
-    if (typeof qpyodideInstance !== 'undefined') {
-      window.mainPyodide = await qpyodideInstance;
-      return window.mainPyodide;
-    }
-    if (typeof mainPyodide !== 'undefined' && mainPyodide) return mainPyodide;
-    // Standalone. One shared promise, so math-exercise and py-exercise on the
-    // same page do not start two Pyodide instances. Same protocol as
-    // math-exercise's shared/pyodide-runtime.js.
-    var cdnBase = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
-    if (!globalThis.__qExercisePyodide) {
-      globalThis.__qExercisePyodide = (async function () {
-        await loadScript(cdnBase + 'pyodide.js');
-        return await loadPyodide({ indexURL: cdnBase });
-      })();
-    }
-    var pending = globalThis.__qExercisePyodide;
-    try {
-      window.mainPyodide = await pending;
-      return window.mainPyodide;
-    } catch (error) {
-      // Allow a later attempt after a temporary network failure.
-      if (globalThis.__qExercisePyodide === pending) globalThis.__qExercisePyodide = undefined;
-      var failed = document.querySelector('script[src="' + cdnBase + 'pyodide.js"]');
-      if (failed && failed.dataset.qLoaded !== '1') failed.remove();
-      throw error;
-    }
+  // The page-wide Pyodide bootstrap shared with math-exercise
+  // (shared/pyodide-runtime.js, a byte-identical copy of math-exercise's file).
+  // It reuses pyodide-interaktiv's runtime when present and asks again for
+  // every run, because that runtime can be replaced (Stop/restart).
+  function loadScript(src) { return globalThis.MathExerciseRuntime.loadScript(src); }
+  function ensurePyodide() { return globalThis.MathExerciseRuntime.ensurePyodide(); }
+  function runtimeUnavailable(error) {
+    return error && (error.code === 'pyodide-timeout' || /^Failed to load: https?:/.test(String(error.message || '')));
   }
 
   // Localized checker messages live in the runtime's namespace; set them for
@@ -186,9 +142,7 @@
     }
     require.config({ paths: { vs: cdnBase } });
     await new Promise(function (resolve, reject) {
-      var timer = setTimeout(function () { reject(new Error('Timed out loading the Monaco editor')); }, 60000);
-      require(['vs/editor/editor.main'], function () { clearTimeout(timer); resolve(); },
-        function (error) { clearTimeout(timer); reject(error); });
+      require(['vs/editor/editor.main'], function () { resolve(); }, reject);
     });
   }
 
@@ -576,11 +530,12 @@
         }};
 
       } catch (err) {
-        resultArea.innerHTML =
-          '<div class="py-exercise-error">' +
-          '<strong>' + L.unexpectedError + '</strong>' +
-          '<pre>' + escapeHtml(String(err)) + '</pre>' +
-          '</div>';
+        resultArea.innerHTML = runtimeUnavailable(err)
+          ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
+          : '<div class="py-exercise-error">' +
+            '<strong>' + L.unexpectedError + '</strong>' +
+            '<pre>' + escapeHtml(String(err)) + '</pre>' +
+            '</div>';
       } finally {
         running = false;
         checkBtn.disabled = false;
@@ -744,7 +699,7 @@
       if (msgEl) {
         msgEl.innerHTML =
           '<div class="py-submission-error">' +
-          escapeHtml(L.encodingError) + escapeHtml(String(err)) +
+          (runtimeUnavailable(err) ? escapeHtml(L.pythonUnavailable) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
           '</div>';
       }
     }
@@ -849,8 +804,17 @@
     ensurePyodide().catch(function (error) {
       console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
     });
+    var monaco = ensureMonaco();
+    var ready = false;
+    function setUpExercises() {
+      if (ready) return;
+      ready = true;
+      (window.__pyExercises || []).forEach(setupExercise);
+      initSubmission();
+      initDownload();
+    }
     try {
-      await withTimeout(ensureMonaco(), 60000, 'Timed out loading the Monaco editor');
+      await withTimeout(monaco, 60000, 'Timed out loading the Monaco editor');
     } catch (error) {
       console.warn('py-exercise: the code editor could not be loaded:', error);
       (window.__pyExercises || []).forEach(function (exercise) {
@@ -861,13 +825,11 @@
         message.textContent = L.editorUnavailable;
         container.replaceChildren(message);
       });
+      // On a slow connection the editor may still arrive; it then replaces the messages.
+      monaco.then(setUpExercises, function () {});
       return;
     }
-
-    var exercises = window.__pyExercises || [];
-    exercises.forEach(setupExercise);
-    initSubmission();
-    initDownload();
+    setUpExercises();
   });
 
 })();

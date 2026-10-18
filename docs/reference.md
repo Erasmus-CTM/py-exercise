@@ -256,8 +256,12 @@ assert fib(10) == 55, "fib(10) should return 55"
 
 | Dependency | Purpose |
 |---|---|
-| Pyodide 0.27+ (CDN) | Loaded automatically |
-| Monaco Editor 0.46+ (CDN) | Loaded automatically |
+| Pyodide 0.27.2 (CDN) | Loaded automatically; one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
+| Monaco Editor 0.46.0 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
+
+`_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
+of math-exercise's file of the same name (the CTM Assessment build checks
+this); change it there first.
 
 ---
 
