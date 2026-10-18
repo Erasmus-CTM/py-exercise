@@ -187,6 +187,25 @@ test('a long check in a worker runtime offers Stop, and stopping is reported', a
   dom.window.close();
 });
 
+test('loading packages does not count towards stop-after', async () => {
+  const { w, dom } = page(exercises().slice(0, 1));
+  w.__pyExerciseSlowCheckMs = 30;
+  const interpreter = fakeInterpreter();
+  interpreter.loadPackagesFromImports = () => tick(300);   // a slow network
+  interpreter.restart = () => {};
+  w.qpyodideInstance = Promise.resolve(interpreter);
+  w.eval(source);
+  await until(() => w.document.querySelector('.py-exercise-check'));
+  await tick(20);
+  let offered = false;
+  new w.MutationObserver(() => { offered = offered || !!w.document.querySelector('.py-exercise-stop'); })
+    .observe(w.document.body, { childList: true, subtree: true });
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => /passed|✓|1\/1/i.test(result(w, 1)) && !w.document.querySelector('.py-exercise-running'));
+  assert.equal(offered, false);
+  dom.window.close();
+});
+
 test('a Stop from another component is reported as stopped, and queued checks then run', async () => {
   const { w, dom } = page(exercises());
   w.__pyExerciseSlowCheckMs = 30;

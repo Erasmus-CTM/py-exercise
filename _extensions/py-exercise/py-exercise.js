@@ -505,18 +505,23 @@
 
       try {
         stops = runtime.stopCount();
-        cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
+        // The clock starts once Python and the packages are loaded: on a slow
+        // network the first load alone can take longer than stop-after.
+        var startSlow = function () {
+          cancelSlow();
+          cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
             (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
-          var note = resultArea.querySelector('.py-exercise-running');
-          if (!note) return;
-          note.textContent = L.slowCheck + ' ';
-          var stopBtn = document.createElement('button');
-          stopBtn.type = 'button';
-          stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
-          stopBtn.textContent = L.stop;
-          stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
-          note.appendChild(stopBtn);
-        });
+            var note = resultArea.querySelector('.py-exercise-running');
+            if (!note) return;
+            note.textContent = L.slowCheck + ' ';
+            var stopBtn = document.createElement('button');
+            stopBtn.type = 'button';
+            stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
+            stopBtn.textContent = L.stop;
+            stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
+            note.appendChild(stopBtn);
+          });
+        };
         var used = null;
         var check = function () {
           return pythonTransaction(async function () {
@@ -526,6 +531,7 @@
               if (violations.length > 0) return { violations: violations };
             }
             await py.loadPackagesFromImports(studentCode);
+            startSlow();
             return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
           });
         };
