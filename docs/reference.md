@@ -40,9 +40,9 @@ Everything **below** is hidden and checked automatically after running the code.
 | Option | Type | Default | Description |
 |--------|-----|----------|--------------|
 | `label` | String | `py-exercise-N` | Unique ID of the exercise |
-| `caption` | String | — | Title shown above the exercise |
-| `forbidden-imports` | comma-separated | — | Forbidden `import` statements |
-| `forbidden-keywords` | comma-separated | — | Forbidden Python keywords |
+| `caption` | String | — | Name stored with the exercise in the JSON download; it is not displayed on the page |
+| `forbidden-imports` | comma-separated | — | Forbidden `import` statements (top-level module name) |
+| `forbidden-keywords` | comma-separated | — | Forbidden function or method names such as `sum` or `sort` (`sort` forbids both `sort(x)` and `x.sort()`; write names without a leading dot), and the statements `for`, `while`, `with`, `lambda`, `class`, `global`, `nonlocal`, `try`, `raise`, `del`, `assert`, `yield` |
 | `show-test-hints` | `true` / `false` | `true` | Show the assertion message on failure |
 
 ---
@@ -146,9 +146,17 @@ error message is shown instead.
 ```
 
 Typical use cases:
-- Forbidding `for`/`while` → the solution must use a list comprehension or `map`
+- Forbidding `for`/`while` → the solution must use a list comprehension, `map`
+  or recursion (comprehensions are not `for` statements and remain allowed)
 - Forbidding `sorted` → a custom sorting algorithm is required
-- Forbidding `os`, `sys`, `subprocess` → safety in learning environments
+- Forbidding `math` → students practise a formula instead of using a library
+
+The check reads the student's code before it runs. It recognises direct calls
+(`sum(x)`, `x.sort()`) and the listed statements; other words, such as `if` or
+`return`, are ignored. It is a teaching restriction, not a security boundary:
+indirect forms such as `f = sum`, `__import__("math")` or `exec(...)` are not
+detected. If an exercise requires a particular method (for example recursion),
+add a test that checks it.
 
 ---
 
@@ -165,7 +173,9 @@ enabled by setting `submission: true` in the document front matter. Students
 enter their Student ID and Quiz ID, then click the button to get an encoded
 string to submit.
 
-The encoded string can be decoded by the instructor with:
+The encoded string can be decoded by the instructor with the following
+function (the repository's `decode.py` asks for the key and string and prints
+the decoded JSON):
 
 ```python
 import json, base64
@@ -192,14 +202,20 @@ enabled.
 
 ## Test Output
 
-After running, each test shows:
+Each top-level statement below `## TESTS ##` is run and reported as one test,
+in the same namespace as the student's code. Put helper imports or set-up
+inside the assertion (or inside one `with`/`try` block) so that they are not
+counted as passed tests. After running, each test shows:
 
-- ✅ **Passed** – test succeeded
-- ❌ **Failed** – with the assertion message (if `show-test-hints: true`)
+- ✓ **Test n** – test succeeded
+- ✗ **Test n** – with the assertion message (if `show-test-hints: true`)
 
 The assertion message is the text after the comma in `assert ..., "message"`.
-If `show-test-hints: false` is set, students only see whether a test failed,
-without a hint as to why.
+A test without a message shows "Assertion failed"; a test that raises another
+error shows that error. If `show-test-hints: false` is set, students only see
+whether a test failed, without a hint as to why. Output printed by the
+student's code is shown above the results; output printed while the tests run
+is not shown, so capture it in the test if it should be checked.
 
 ---
 
@@ -216,13 +232,13 @@ py-exercise:
   lang: en
 ---
 
+Implement a recursive function `fib(n)` that returns the n-th
+Fibonacci number (fib(0) = 0, fib(1) = 1).
+
 ```{py-exercise}
 #| label: fibonacci
 #| caption: Fibonacci sequence
 #| forbidden-keywords: for, while
-Implement a recursive function `fib(n)` that returns the n-th
-Fibonacci number (fib(0) = 0, fib(1) = 1).
-
 def fib(n):
     pass
 
@@ -240,8 +256,47 @@ assert fib(10) == 55, "fib(10) should return 55"
 
 | Dependency | Purpose |
 |---|---|
-| Pyodide 0.27+ (CDN) | Loaded automatically |
-| Monaco Editor 0.46+ (CDN) | Loaded automatically |
+| Pyodide 0.27.2 (CDN) | Loaded automatically; one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
+| Monaco Editor 0.46 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
+
+### Tests
+
+`npm ci && npm test` runs the browser-runtime tests (jsdom) and, when Quarto is
+installed, the render tests; set `AI_FEEDBACK_EXTENSION` to an installed
+ai-feedback folder for the feedback cases. `python -m unittest discover -s tests`
+challenges the published examples and checks the isolation of learner code.
+In VS Code, **Terminal → Run Task…** offers the same commands
+(`.vscode/tasks.json`): the default test task runs the tests, the default build
+task renders the example and then tests.
+
+### What learner code can change
+
+Each **Check** runs the learner's program in a fresh namespace, so nothing
+from an earlier check or from interactive Pyodide cells leaks in, and the
+checker's own code lives in a private module (`_ctm_py_exercise`), not in the
+namespace the interactive cells share. Interpreter state the program changes
+(`builtins`, `sys.stdout`/`stdin`/`stderr`, the recursion limit, `sys.path`,
+the working directory, the CTM modules in `sys.modules`) is restored after
+the check, so one exercise cannot break another or a mathematics exercise on
+the page. `sys.exit()` in learner code or tests is reported, not raised.
+
+Grading happens in the learner's browser: the tests are part of the page and a
+determined learner can read them or fake a result. Use it for practice, not
+for high-stakes assessment. A program that never ends (an endless loop) cannot
+be interrupted when Python runs on the page itself; the page has to be
+reloaded. When pyodide-interaktiv is on the page, Python runs in a worker: a
+check that runs longer than 20 s offers **Stop**, which restarts Python for the
+whole page. Loading Python and packages is not counted; a load that has not
+finished after 180 s offers Stop, or ends with a message while Python is still
+starting. Change the time with `py-exercise: {stop-after: 30}` (seconds), or
+for all CTM components of a project with `ctm-assessment: {stop-after: 30}`.
+A check interrupted by an interactive cell's Stop or restart is repeated once
+on the new runtime. As before, `if __name__ == "__main__":` blocks do not run
+during a check.
+
+`_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
+of math-exercise's file of the same name (the CTM Assessment build checks
+this); change it there first.
 
 ---
 

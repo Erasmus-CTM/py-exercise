@@ -25,6 +25,13 @@ jobs:
       - run: quarto add ./_feedback-source --no-prompt
       - name: Test the published example requirements
         run: python -m unittest discover -s tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test the browser runtime (jsdom)
+        run: |
+          npm ci --ignore-scripts
+          npm test
       - name: Render standalone example
         run: |
           quarto render example.qmd

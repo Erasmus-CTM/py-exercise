@@ -1,4 +1,16 @@
 local feedback = nil
+-- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
+local dependencies = nil
+local function deps()
+  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
+  return dependencies
+end
+
+-- Decided per page in the first pass: load ai-feedback for exercise feedback
+-- or for `.ai-feedback` activities on the page; nothing otherwise.
+local needFeedback = false
+-- Seconds after which a running check offers Stop (stop-after).
+local stopAfter = 20
 ----
 -- py-exercise.lua
 --
@@ -70,7 +82,8 @@ local function readFile(filename)
   local path = quarto.utils.resolve_path(filename)
   local f = io.open(path, "r")
   if not f then
-    error("py-exercise: cannot open '" .. filename ..
+    -- assert: Quarto replaces error() with a logger that does not stop the render.
+    assert(false, "py-exercise: cannot open '" .. filename ..
           "' – make sure it is present in the _extensions/py-exercise/ directory.")
   end
   local content = f:read("*a")
@@ -172,12 +185,14 @@ local function ensureExerciseSetup()
     submissionKey = submissionKey,
     lang          = lang,
     feedback      = feedbackEnabled,
+    stopAfter     = stopAfter,
   }
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
 
   -- JS
-  local js = (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
+  local js = readFile("shared/pyodide-runtime.js") .. "\n"
+    .. (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
   quarto.doc.include_text("after-body",
     "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
 end
@@ -223,6 +238,7 @@ local function Meta(meta)
   -- Quarto's `lang:` and have no `py-exercise:` block, so this happens before
   -- the early return below.
   lang = resolveLang(meta)
+  stopAfter = deps().stopAfter(meta, "py-exercise")
 
   if not meta["py-exercise"] then return meta end
   local cfg = meta["py-exercise"]
@@ -259,7 +275,7 @@ local function CodeBlock(el)
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
   if feedbackEnabled and (not opts["task"] or opts["task"] == "") then
-    error("py-exercise: shared feedback requires #| task: with the learner's assignment.")
+    assert(false, "py-exercise: shared feedback requires #| task: with the learner's assignment.")
   end
 
   local cellForbiddenImports  = splitCommaList(opts["forbidden-imports"])
@@ -283,8 +299,8 @@ local function CodeBlock(el)
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
     task              = opts["task"],
-    policySelection   = feedback and feedback.selection(el, opts) or nil,
-    feedbackContext   = feedback and feedback.context(el, opts) or nil,
+    policySelection   = feedbackEnabled and feedback and feedback.selection(el, opts) or nil,
+    feedbackContext   = feedbackEnabled and feedback and feedback.context(el, opts) or nil,
     feedbackLanguage  = opts["feedback-language"] or lang,
     learnerLevel      = opts["learner-level"] or "",
   }
@@ -308,16 +324,24 @@ end
 
 return {
   { Meta = Meta },
+  -- A page that uses a missing optional extension stops here; then decide
+  -- whether ai-feedback is needed, before callouts are marked for it.
+  { Pandoc = function(doc)
+      if not quarto.doc.is_format("html") then return doc end
+      deps().requireUsed(doc, "py-exercise")
+      needFeedback = feedbackEnabled or deps().uses(doc)["ai-feedback"] == true
+      return doc
+    end },
   { Callout = function(c)
-      if feedbackEnabled and quarto.doc.is_format("html") then
-        feedback = feedback or dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+      if needFeedback and quarto.doc.is_format("html") then
+        feedback = feedback or deps().feedback()
         return feedback.markCallout(c)
       end
       return c
     end },
   { Pandoc = function(doc)
-      if feedbackEnabled and quarto.doc.is_format("html") then
-        feedback = dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+      if needFeedback and quarto.doc.is_format("html") then
+        feedback = feedback or deps().feedback()
         return feedback.prepare(doc)
       end
       return doc

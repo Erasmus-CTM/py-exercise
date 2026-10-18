@@ -14,6 +14,12 @@
       running:              '⏳ Checking…',
       errorHeader:          '❌ Error in code:',
       unexpectedError:      '❌ Unexpected error:',
+      editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
+      pythonUnavailable:    'Python could not be loaded (no connection to cdn.jsdelivr.net?). Check the connection and press Check again.',
+      slowCheck:            'Still running – an endless loop?',
+      slowLoad:             'Python is still loading.',
+      stop:                 'Stop',
+      stopped:              'Stopped. Python was restarted (interactive cells on this page lost their variables).',
       stdoutLabel:          'Output:',
       allPassed: function (n) {
         return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
@@ -56,6 +62,12 @@
       running:              '⏳ Überprüfe…',
       errorHeader:          '❌ Fehler im Code:',
       unexpectedError:      '❌ Unerwarteter Fehler:',
+      editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
+      pythonUnavailable:    'Python konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Prüfe die Verbindung und klicke erneut auf Überprüfen.',
+      slowCheck:            'Läuft noch – eine Endlosschleife?',
+      slowLoad:             'Python wird noch geladen.',
+      stop:                 'Abbrechen',
+      stopped:              'Abgebrochen. Python wurde neu gestartet (interaktive Zellen auf dieser Seite haben ihre Variablen verloren).',
       stdoutLabel:          'Ausgabe:',
       allPassed: function (n) {
         return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
@@ -96,61 +108,44 @@
   // Utilities
   // ---------------------------------------------------------------------------
 
-  // Laedt ein Skript genau einmal. Ist der Tag schon da, aber noch nicht
-  // fertig geladen, wird auf dessen load-Event gewartet - NICHT sofort
-  // aufgeloest. Sonst greift eine zweite Extension auf globals zu, die es
-  // noch gar nicht gibt.
-  function loadScript(src) {
-    return new Promise(function (resolve, reject) {
-      var existing = document.querySelector('script[src="' + src + '"]');
-      if (existing) {
-        if (existing.dataset.qLoaded === '1') { resolve(); return; }
-        existing.addEventListener('load', function () { resolve(); });
-        existing.addEventListener('error', function () {
-          reject(new Error('Failed to load: ' + src));
-        });
-        return;
-      }
-      var s = document.createElement('script');
-      s.src = src;
-      s.onload = function () { s.dataset.qLoaded = '1'; resolve(); };
-      s.onerror = function () { reject(new Error('Failed to load: ' + src)); };
-      document.head.appendChild(s);
-    });
+  // The page-wide Pyodide bootstrap shared with math-exercise
+  // (shared/pyodide-runtime.js, a byte-identical copy of math-exercise's file).
+  // It reuses pyodide-interaktiv's runtime when present and asks again for
+  // every run, because that runtime can be replaced (Stop/restart).
+  function loadScript(src) { return globalThis.MathExerciseRuntime.loadScript(src); }
+  function ensurePyodide() { return globalThis.MathExerciseRuntime.ensurePyodide(); }
+  function runtimeUnavailable(error) {
+    return error && (error.code === 'pyodide-timeout' || /^Failed to load: https?:/.test(String(error.message || '')));
   }
 
-  async function ensurePyodide() {
-    // coatless-quarto/pyodide is loading — wait for its promise instead of loading a second instance
-    if (typeof qpyodideInstance !== 'undefined') {
-      window.mainPyodide = await qpyodideInstance;
-      return;
-    }
-    // coatless already finished
-    if (typeof mainPyodide !== 'undefined') return;
-    // Standalone. Gemeinsames Promise, damit math-exercise und py-exercise auf
-    // derselben Seite nicht zwei Pyodide-Instanzen starten oder sich beim
-    // Laden ins Gehege kommen.
-    var cdnBase = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
-    if (!globalThis.__qExercisePyodide) {
-      globalThis.__qExercisePyodide = (async function () {
-        await loadScript(cdnBase + 'pyodide.js');
-        return await loadPyodide({ indexURL: cdnBase });
-      })();
-    }
-    window.mainPyodide = await globalThis.__qExercisePyodide;
+
+  // All exercises on a page share one Python namespace: each check's
+  // set-globals/evaluate sequence runs as one transaction, in click order.
+  var pythonQueue = Promise.resolve();
+  function pythonTransaction(run) {
+    var result = pythonQueue.then(run);
+    pythonQueue = result.catch(function () {});
+    return result;
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
   // use), we load the AMD loader from CDN and let it fetch the editor itself.
   async function ensureMonaco() {
-    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs';
+    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46/min/vs';
     if (typeof require === 'undefined') {
       await loadScript(cdnBase + '/loader.js');
     }
     require.config({ paths: { vs: cdnBase } });
-    await new Promise(function (resolve) {
-      require(['vs/editor/editor.main'], resolve);
+    await new Promise(function (resolve, reject) {
+      require(['vs/editor/editor.main'], function () { resolve(); }, reject);
     });
+  }
+
+  // A script tag that already failed never fires again; do not wait forever.
+  function withTimeout(promise, ms, message) {
+    return Promise.race([promise, new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error(message)); }, ms);
+    })]);
   }
 
   function escapeHtml(str) {
@@ -175,124 +170,128 @@
   var exerciseEditors = {};
 
   // ---------------------------------------------------------------------------
-  // Python: AST-based violation checker
+  // Python: the checker, runner and encoder live in a private module
+  // (_ctm_py_exercise), not in the interpreter's global namespace, which
+  // pyodide-interaktiv cells use like a notebook. Every check runs the
+  // learner's code in a fresh namespace; interpreter state it changes
+  // (builtins, sys.stdout, recursion limit, ...) is restored afterwards
+  // (_ctm_guard, shared/pyodide-runtime.js).
   // ---------------------------------------------------------------------------
-  var CHECKER_PY = [
-    'import ast as _ast, json as _json',
-    '',
-    '_fi = list(_exercise_forbidden_imports)',
-    '_fk = list(_exercise_forbidden_keywords)',
+  var PY_MODULE = '_ctm_py_exercise';
+  var MODULE_PY = [
+    'import ast as _ast, io as _io, json as _json, base64 as _b64, sys as _sys, traceback as _traceback',
+    'try:',
+    '    import _ctm_guard',
+    'except ImportError:  # native test runners',
+    '    _ctm_guard = None',
     '',
     '_KW_NODES = {',
-    '    "for":      _ast.For,',
-    '    "while":    _ast.While,',
-    '    "with":     _ast.With,',
-    '    "lambda":   _ast.Lambda,',
-    '    "class":    _ast.ClassDef,',
-    '    "global":   _ast.Global,',
-    '    "nonlocal": _ast.Nonlocal,',
-    '    "try":      _ast.Try,',
-    '    "raise":    _ast.Raise,',
-    '    "del":      _ast.Delete,',
-    '    "assert":   _ast.Assert,',
-    '    "yield":    _ast.Yield,',
+    '    "for": _ast.For, "while": _ast.While, "with": _ast.With, "lambda": _ast.Lambda,',
+    '    "class": _ast.ClassDef, "global": _ast.Global, "nonlocal": _ast.Nonlocal, "try": _ast.Try,',
+    '    "raise": _ast.Raise, "del": _ast.Delete, "assert": _ast.Assert, "yield": _ast.Yield,',
     '}',
     '',
-    '_violations = []',
-    '_seen = set()',
-    '',
-    'def _add(msg):',
-    '    if msg not in _seen:',
-    '        _seen.add(msg)',
-    '        _violations.append(msg)',
-    '',
-    'try:',
-    '    _tree = _ast.parse(_exercise_student_code)',
-    '    for _node in _ast.walk(_tree):',
-    '        if isinstance(_node, _ast.Import):',
-    '            for _a in _node.names:',
-    '                _top = _a.name.split(".")[0]',
-    '                if _top in _fi:',
-    '                    _add(_msg_forbidden_import.format(_top))',
-    '        elif isinstance(_node, _ast.ImportFrom):',
-    '            if _node.module:',
-    '                _top = _node.module.split(".")[0]',
-    '                if _top in _fi:',
-    '                    _add(_msg_forbidden_import.format(_top))',
-    '        elif isinstance(_node, _ast.Call):',
-    '            if isinstance(_node.func, _ast.Name):',
-    '                if _node.func.id in _fk:',
-    '                    _add(_msg_forbidden_function.format(_node.func.id))',
-    '            elif isinstance(_node.func, _ast.Attribute):',
-    '                if _node.func.attr in _fk:',
-    '                    _add(_msg_forbidden_method.format(_node.func.attr))',
-    '        else:',
-    '            for _kw, _nt in _KW_NODES.items():',
-    '                if _kw in _fk and isinstance(_node, _nt):',
-    '                    _add(_msg_forbidden_keyword.format(_kw))',
-    'except SyntaxError:',
-    '    pass',
-    '',
-    '_json.dumps(_violations)',
-  ].join('\n');
-
-  // ---------------------------------------------------------------------------
-  // Python: main runner
-  // ---------------------------------------------------------------------------
-  var RUNNER_PY = [
-    'import ast, json, io, sys, traceback',
-    '',
-    '_ns = {}',
-    '_results = {"student_error": None, "stdout": "", "tests": []}',
-    '',
-    '_buf = io.StringIO()',
-    '_old_stdout = sys.stdout',
-    'sys.stdout = _buf',
-    'try:',
-    '    exec(compile(_exercise_student_code, "<student>", "exec"), _ns)',
-    '    _results["stdout"] = _buf.getvalue()',
-    'except Exception:',
-    '    _results["student_error"] = traceback.format_exc()',
-    '    _results["stdout"] = _buf.getvalue()',
-    'finally:',
-    '    sys.stdout = _old_stdout',
-    '',
-    'if _results["student_error"] is None:',
+    'def violations(code, forbidden_imports, forbidden_keywords, messages):',
+    '    found = []',
+    '    def add(message):',
+    '        if message not in found:',
+    '            found.append(message)',
     '    try:',
-    '        _tree = ast.parse(_exercise_test_code)',
-    '        for _stmt in _tree.body:',
-    '            _single = compile(',
-    '                ast.Module(body=[_stmt], type_ignores=[]),',
-    '                "<test>", "exec"',
-    '            )',
+    '        tree = _ast.parse(code)',
+    '    except SyntaxError:',
+    '        return found',
+    '    for node in _ast.walk(tree):',
+    '        if isinstance(node, _ast.Import):',
+    '            for alias in node.names:',
+    '                top = alias.name.split(".")[0]',
+    '                if top in forbidden_imports:',
+    '                    add(messages["forbidden_import"].format(top))',
+    '        elif isinstance(node, _ast.ImportFrom):',
+    '            if node.module:',
+    '                top = node.module.split(".")[0]',
+    '                if top in forbidden_imports:',
+    '                    add(messages["forbidden_import"].format(top))',
+    '        elif isinstance(node, _ast.Call):',
+    '            if isinstance(node.func, _ast.Name) and node.func.id in forbidden_keywords:',
+    '                add(messages["forbidden_function"].format(node.func.id))',
+    '            elif isinstance(node.func, _ast.Attribute) and node.func.attr in forbidden_keywords:',
+    '                add(messages["forbidden_method"].format(node.func.attr))',
+    '        else:',
+    '            for keyword, node_type in _KW_NODES.items():',
+    '                if keyword in forbidden_keywords and isinstance(node, node_type):',
+    '                    add(messages["forbidden_keyword"].format(keyword))',
+    '    return found',
+    '',
+    'def run(code, tests, messages):',
+    '    namespace = {}  # as before 0.3: __name__ is not "__main__", so main() blocks do not run',
+    '    results = {"student_error": None, "stdout": "", "tests": []}',
+    '    state = _ctm_guard.snapshot() if _ctm_guard else None',
+    '    buffer = _io.StringIO()',
+    '    stdout = _sys.stdout',
+    '    try:',
+    '        _sys.stdout = buffer',
+    '        try:',
+    '            exec(compile(code, "<student>", "exec"), namespace)',
+    '        except (Exception, SystemExit):',
+    '            results["student_error"] = _traceback.format_exc()',
+    '        results["stdout"] = buffer.getvalue()',
+    '        if results["student_error"] is None:',
     '            try:',
-    '                exec(_single, _ns)',
-    '                _results["tests"].append({"passed": True})',
-    '            except AssertionError as e:',
-    '                _results["tests"].append({',
-    '                    "passed": False,',
-    '                    "message": str(e) if str(e) else _msg_assertion_failed',
-    '                })',
-    '            except Exception as e:',
-    '                _results["tests"].append({"passed": False, "message": _msg_test_error.format(e)})',
-    '    except SyntaxError as e:',
-    '        _results["student_error"] = _msg_syntax_error.format(e)',
+    '                tree = _ast.parse(tests)',
+    '            except SyntaxError as error:',
+    '                results["student_error"] = messages["syntax_error"].format(error)',
+    '                tree = None',
+    '            for statement in (tree.body if tree else []):',
+    '                single = compile(_ast.Module(body=[statement], type_ignores=[]), "<test>", "exec")',
+    '                try:',
+    '                    exec(single, namespace)',
+    '                    results["tests"].append({"passed": True})',
+    '                except AssertionError as error:',
+    '                    results["tests"].append({"passed": False, "message": str(error) if str(error) else messages["assertion_failed"]})',
+    '                except (Exception, SystemExit) as error:',
+    '                    results["tests"].append({"passed": False, "message": messages["test_error"].format(error)})',
+    '    finally:',
+    '        _sys.stdout = stdout',
+    '        if state is not None:',
+    '            _ctm_guard.restore(state)',
+    '    return results',
     '',
-    'json.dumps(_results)',
+    'def encode(payload, key):',
+    '    key = key.encode("utf-8")',
+    '    raw = _json.dumps(payload, ensure_ascii=False).encode("utf-8")',
+    '    return _b64.b64encode(bytes(b ^ key[i % len(key)] for i, b in enumerate(raw))).decode("ascii")',
+    '',
+    'def call(caller):',
+    '    # The request arrives as one JSON string in the shared namespace; take it out.',
+    '    request = _json.loads(caller.pop("_ctm_py_request"))',
+    '    function = {"violations": violations, "run": run, "encode": encode}[request["function"]]',
+    '    return _json.dumps(function(*request["args"]))',
   ].join('\n');
+  var CALL_PY = '__import__("' + PY_MODULE + '").call(globals())';
 
-  // ---------------------------------------------------------------------------
-  // Python: submission encoder
-  // ---------------------------------------------------------------------------
-  // Encoding: JSON → UTF-8 bytes → XOR with cycling key → Base64.
-  var ENCODER_PY = [
-    'import json as _json, base64 as _b64',
-    '',
-    '_key  = _submission_key.encode("utf-8")',
-    '_raw  = _json.dumps(_submission_payload, ensure_ascii=False).encode("utf-8")',
-    '_xord = bytes(b ^ _key[i % len(_key)] for i, b in enumerate(_raw))',
-    '_b64.b64encode(_xord).decode("ascii")',
-  ].join('\n');
+  // Calls a function of the private module on the current runtime, installing
+  // it first (again after a restart, or after other code on the page removed it).
+  async function pythonCall(py, name, args) {
+    var runtime = globalThis.MathExerciseRuntime;
+    for (var attempt = 0; ; attempt++) {
+      await runtime.ensureGuard(py);
+      await runtime.installModule(py, PY_MODULE, MODULE_PY);
+      await py.globals.set('_ctm_py_request', JSON.stringify({ function: name, args: args }));
+      try {
+        return JSON.parse(await py.runPythonAsync(CALL_PY));
+      } catch (error) {
+        if (attempt || !/No module named '_ctm_|has no attribute 'call'/.test(String(error))) throw error;
+        runtime.forgetModules(py);
+      }
+    }
+  }
+  function messages() {
+    return {
+      forbidden_import: L.msgForbiddenImport, forbidden_function: L.msgForbiddenFunction,
+      forbidden_method: L.msgForbiddenMethod, forbidden_keyword: L.msgForbiddenKeyword,
+      assertion_failed: L.msgAssertionFailed, test_error: L.msgTestError, syntax_error: L.msgSyntaxError,
+    };
+  }
 
   // ---------------------------------------------------------------------------
   // Result rendering
@@ -435,7 +434,7 @@
       editor = monaco.editor.create(editorContainer, {
         value: savedCode !== null ? savedCode : starterCode,
         language: 'python',
-        theme: 'vs-light',
+        theme: 'vs',
         automaticLayout: true,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
@@ -477,39 +476,85 @@
         }, 500);
       });
 
-      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck);
+      // addCommand registers a global keybinding (the last registration wins),
+      // so bind Shift+Enter to this exercise whenever its editor gains focus.
+      // The context key keeps it out of other Monaco editors on the page.
+      var keyContext = typeof editor.createContextKey === 'function'
+        ? (editor.createContextKey('pyExerciseEditor', true), 'pyExerciseEditor') : undefined;
+      var bindCheckKey = function () { editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck, keyContext); };
+      editor.onDidFocusEditorText(bindCheckKey);
+      bindCheckKey();
     });
 
+    var running = false;
     async function runCheck() {
-      if (!editor) return;
+      // Shift+Enter bypasses the disabled button; never queue duplicates.
+      if (!editor || running) return;
+      running = true;
       feedbackAdapter?.reset('run');
       clearFeedback();
 
       resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
+      // A runtime in a worker (pyodide-interaktiv) can be stopped; Python on
+      // the page itself cannot, the page then only reloads.
+      // `py-exercise: stop-after:` / `ctm-assessment: stop-after:` (default 20 s).
+      var runtime = globalThis.MathExerciseRuntime;
+      var stops = null, cancelSlow = function () {};
       checkBtn.disabled = true;
       resetBtn.disabled = true;
 
       var studentCode = editor.getValue();
 
       try {
-        mainPyodide.globals.set('_exercise_student_code',  studentCode);
-        mainPyodide.globals.set('_exercise_test_code',     testsCode);
-        mainPyodide.globals.set('_exercise_forbidden_imports',  mainPyodide.toPy(forbiddenImports));
-        mainPyodide.globals.set('_exercise_forbidden_keywords', mainPyodide.toPy(forbiddenKeywords));
-
-        if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
-          var violationsRaw = await mainPyodide.runPythonAsync(CHECKER_PY);
-          var violations = JSON.parse(violationsRaw);
-          if (violations.length > 0) {
-            renderViolations(resultArea, violations);
-            if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
-            return;
-          }
+        stops = runtime.stopCount();
+        // The clock starts once Python and the packages are loaded: on a slow
+        // network the first load alone can take longer than stop-after.
+        var startSlow = function (ms) {
+          cancelSlow();
+          cancelSlow = runtime.whenSlow(ms || window.__pyExerciseSlowCheckMs ||
+            (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
+            var note = resultArea.querySelector('.py-exercise-running');
+            if (!note) return;
+            note.textContent = (ms ? L.slowLoad || L.slowCheck : L.slowCheck) + ' ';   // ms: the load limit
+            var stopBtn = document.createElement('button');
+            stopBtn.type = 'button';
+            stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
+            stopBtn.textContent = L.stop;
+            stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
+            note.appendChild(stopBtn);
+          });
+        };
+        var used = null;
+        var check = function () {
+          return pythonTransaction(async function () {
+            var py = used = await ensurePyodide();
+            if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
+              var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
+              if (violations.length > 0) return { violations: violations };
+            }
+            await py.loadPackagesFromImports(studentCode);
+            startSlow();
+            return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
+          });
+        };
+        var outcome;
+        try {
+          startSlow(runtime.loadTimeout);   // a load that never finishes can still be stopped
+          outcome = await check();
+        } catch (error) {
+          // Python restarted by other means (an interactive cell's Stop or
+          // restart): repeat the check once on the new runtime, as math-exercise
+          // does. The runtime object tells, not the (translated) error text.
+          startSlow(runtime.loadTimeout);
+          if (runtime.stopCount() !== stops || !used || (await ensurePyodide()) === used) throw error;
+          outcome = await check();
         }
-
-        await mainPyodide.loadPackagesFromImports(studentCode);
-        var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
-        var data = JSON.parse(raw);
+        if (outcome.violations) {
+          renderViolations(resultArea, outcome.violations);
+          if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
+          return;
+        }
+        var data = outcome.data;
         renderResult(resultArea, data, label, showHints);
         if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {
           status: data.student_error ? 'learner code raised an error' : 'checked',
@@ -519,12 +564,18 @@
         }};
 
       } catch (err) {
-        resultArea.innerHTML =
-          '<div class="py-exercise-error">' +
-          '<strong>' + L.unexpectedError + '</strong>' +
-          '<pre>' + escapeHtml(String(err)) + '</pre>' +
-          '</div>';
+        // Stopped from this or any other component's Stop button.
+        resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
+          ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
+          : runtimeUnavailable(err)
+          ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
+          : '<div class="py-exercise-error">' +
+            '<strong>' + L.unexpectedError + '</strong>' +
+            '<pre>' + escapeHtml(String(err)) + '</pre>' +
+            '</div>';
       } finally {
+        cancelSlow();
+        running = false;
         checkBtn.disabled = false;
         resetBtn.disabled = false;
       }
@@ -669,10 +720,10 @@
     };
 
     try {
-      mainPyodide.globals.set('_submission_payload', mainPyodide.toPy(payload));
-      mainPyodide.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
-
-      var encoded = await mainPyodide.runPythonAsync(ENCODER_PY);
+      var encoded = await pythonTransaction(async function () {
+        var py = await ensurePyodide();
+        return pythonCall(py, 'encode', [payload, submissionConfig.submissionKey || 'py-exercise']);
+      });
 
       if (outArea)  outArea.value = encoded;
       if (outWrap)  outWrap.style.display = '';
@@ -682,7 +733,7 @@
       if (msgEl) {
         msgEl.innerHTML =
           '<div class="py-submission-error">' +
-          escapeHtml(L.encodingError) + escapeHtml(String(err)) +
+          (runtimeUnavailable(err) ? escapeHtml(L.pythonUnavailable) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
           '</div>';
       }
     }
@@ -782,21 +833,37 @@
   // Init
   // ---------------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', async function () {
-    await ensurePyodide();
-    await ensureMonaco();
-
-    mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
-    mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
-    mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
-    mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
-    mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
-    mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
-    mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
-
-    var exercises = window.__pyExercises || [];
-    exercises.forEach(setupExercise);
-    initSubmission();
-    initDownload();
+    // Editors appear as soon as Monaco is ready; Python loads in the
+    // background and the first Check waits for it (and reports a failure).
+    ensurePyodide().catch(function (error) {
+      console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
+    });
+    var monaco = ensureMonaco();
+    var ready = false;
+    function setUpExercises() {
+      if (ready) return;
+      ready = true;
+      (window.__pyExercises || []).forEach(setupExercise);
+      initSubmission();
+      initDownload();
+    }
+    try {
+      await withTimeout(monaco, 60000, 'Timed out loading the Monaco editor');
+    } catch (error) {
+      console.warn('py-exercise: the code editor could not be loaded:', error);
+      (window.__pyExercises || []).forEach(function (exercise) {
+        var container = document.getElementById('py-exercise-' + exercise.id);
+        if (!container) return;
+        var message = document.createElement('div');
+        message.className = 'py-exercise-error';
+        message.textContent = L.editorUnavailable;
+        container.replaceChildren(message);
+      });
+      // On a slow connection the editor may still arrive; it then replaces the messages.
+      monaco.then(setUpExercises, function () {});
+      return;
+    }
+    setUpExercises();
   });
 
 })();

@@ -53,7 +53,10 @@ assert add(-1, 1) == 0,  "add(-1, 1) should return 0"
 
 ## 2 – Give the task a clear name
 
-A short title helps students see the purpose of the next activity.
+A `caption` names the activity in the code and results that students download.
+It is not displayed on the page, so state the purpose in the page text as well.
+
+**Task:** Write a function `square(n)` that returns the square of `n`.
 
 ```{py-exercise}
 #| label: square
@@ -108,9 +111,8 @@ with radius `r`. Use `3.14159` instead of `math.pi`.
 def circle_area(r):
     pass
 ## TESTS ##
-import math as _math
-assert abs(circle_area(1) - _math.pi) < 0.001, "circle_area(1) should be ≈ π"
-assert abs(circle_area(2) - 4 * _math.pi) < 0.001, "circle_area(2) should be ≈ 4π"
+assert abs(circle_area(1) - 3.14159) < 0.001, "circle_area(1) should be ≈ π"
+assert abs(circle_area(2) - 4 * 3.14159) < 0.001, "circle_area(2) should be ≈ 4π"
 assert circle_area(0) == 0, "circle_area(0) should be 0"
 ```
 
@@ -122,7 +124,7 @@ When the goal is to understand a loop or recursion, ask students to use that
 method. Explain the learning reason for the restriction.
 
 **Task:** Write a function `my_sum(lst)` that returns the sum of all elements
-in a list. The built-in `sum()` is **not allowed**.
+in a list. The built-in `sum()` is **not allowed**. An empty list returns `0`.
 
 ```{py-exercise}
 #| label: my-sum
@@ -138,12 +140,13 @@ assert my_sum([-1, 1])   == 0, "my_sum([-1, 1]) should return 0"
 
 ---
 
-**Task:** Write a recursive function `factorial(n)`. Loops (`for`, `while`)
-are not allowed — the solution must be recursive.
+**Task:** Write a recursive function `factorial(n)` for a nonnegative integer
+`n`; the factorial of 0 is 1. Loops (`for`, `while`) are not allowed — the
+function must call itself.
 
 ```{py-exercise}
 #| label: factorial
-#| task: Write factorial(n) recursively for a nonnegative integer n. Do not use for or while loops. The factorial of 0 is 1.
+#| task: Write factorial(n) recursively for a nonnegative integer n: the function must call itself. Do not use for or while loops. The factorial of 0 is 1.
 #| forbidden-keywords: for, while
 def factorial(n):
     pass
@@ -151,6 +154,15 @@ def factorial(n):
 assert factorial(0) == 1,   "factorial(0) should return 1"
 assert factorial(1) == 1,   "factorial(1) should return 1"
 assert factorial(5) == 120, "factorial(5) should return 120"
+try:
+    _original, _calls = factorial, []
+    def factorial(*args, **kwargs):
+        _calls.append(args)
+        return _original(*args, **kwargs)
+    _original(7)  # not computed above, so a cached recursive solution also recurses
+    assert _calls, "factorial should call itself (recursion)"
+finally:
+    factorial = _original
 ```
 
 ---
@@ -162,7 +174,8 @@ the task itself explains the requirements clearly enough for students to reason
 about their mistakes.
 
 **Task:** Write a function `is_palindrome(s)` that returns `True` if the
-string is a palindrome (ignoring case), `False` otherwise.
+string is a palindrome (ignoring case), `False` otherwise. The empty string
+counts as a palindrome.
 
 ```{py-exercise}
 #| label: palindrome
@@ -175,6 +188,7 @@ assert is_palindrome("racecar") == True,  "racecar is a palindrome"
 assert is_palindrome("hello")   == False, "hello is not a palindrome"
 assert is_palindrome("Madam")   == True,  "Madam is a palindrome (case-insensitive)"
 assert is_palindrome("")        == True,  "empty string is a palindrome"
+assert is_palindrome("abca")    == False, "abca is not a palindrome"
 ```
 
 ---

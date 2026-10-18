@@ -20,8 +20,8 @@ def price_with_tax(price, rate):
     return price  # TODO: include tax
 
 ## TESTS ##
-assert price_with_tax(100, 0.25) == 125
-assert price_with_tax(80, 0) == 80
+assert price_with_tax(100, 0.25) == 125, "100 plus 25% tax should be 125"
+assert price_with_tax(80, 0) == 80, "A zero rate should leave the price unchanged"
 ```
 ````
 

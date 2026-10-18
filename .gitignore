@@ -1,0 +1,10 @@
+# Rendered output and local dependency installs (CI renders and publishes)
+/*.html
+/*_files/
+/_site/
+/.quarto/
+/_extensions/ai-feedback/
+/_extensions/*/ai-feedback/
+/_feedback-source/
+__pycache__/
+node_modules/

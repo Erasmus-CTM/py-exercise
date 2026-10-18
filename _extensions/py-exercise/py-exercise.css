@@ -38,9 +38,16 @@
   white-space: nowrap;
 }
 
-.py-exercise-check,
-.py-exercise-reset {
-  font-size: 0.875rem;
+/* Common CTM button size, shared by all CTM components (math-exercise,
+   py-exercise, pyodide-interaktiv, ai-feedback). Set the --ctm-button-*
+   variables in your CSS or theme to change all of them together. */
+.py-exercise-buttons > button,
+.py-download-btn,
+.py-submission-export-btn {
+  font-size: var(--ctm-button-font-size, .875rem);
+  padding: var(--ctm-button-padding-y, .375rem) var(--ctm-button-padding-x, .75rem);
+  line-height: var(--ctm-button-line-height, 1.5);
+  border-radius: var(--ctm-button-radius, var(--bs-border-radius, .375rem));
 }
 
 /* Running indicator */
@@ -245,10 +252,6 @@
   margin-top: 2rem;
 }
 
-.py-submission-export-btn {
-  font-size: 0.9rem;
-}
-
 .py-submission-msg {
   margin-top: 0.5rem;
 }
@@ -307,7 +310,6 @@
 }
 
 .py-download-btn {
-  font-size: 0.875rem;
   white-space: nowrap;
 }
 
