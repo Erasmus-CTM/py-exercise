@@ -1,5 +1,17 @@
--- Locate the single project installation; no feedback implementation is bundled here.
+-- Locate the project installation; no feedback implementation is bundled here.
 local function sharedFeedback()
+  -- An ai-feedback installed next to this extension (the CTM Assessment
+  -- umbrella, or one owner folder) belongs to the same set and wins, so the
+  -- umbrella and separately added copies elsewhere do not conflict.
+  local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)[/\\][^/\\]+[/\\][^/\\]+$")
+  local sibling = here and pandoc.path.join({here, "ai-feedback", "feedback-quarto.lua"})
+  local file = sibling and io.open(sibling, "r")
+  if file then
+    file:close()
+    local shared = dofile(sibling)
+    assert(shared.selection, "Scoped feedback policies require ai-feedback 0.6.0 or later. Run: quarto add Erasmus-CTM/ai-feedback")
+    return shared
+  end
   local base = quarto.project.directory or pandoc.path.directory(quarto.doc.input_file)
   while base and base ~= "" do
     local extensions = pandoc.path.join({base, "_extensions"})

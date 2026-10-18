@@ -119,17 +119,19 @@
     });
   }
 
+  // Resolves to the current Pyodide runtime. A Pyodide extension on the page
+  // may replace its runtime (pyodide-interaktiv's Stop/restart), so callers
+  // ask again for every run instead of caching it.
   async function ensurePyodide() {
-    // coatless-quarto/pyodide is loading — wait for its promise instead of loading a second instance
+    // pyodide-interaktiv (or coatless-quarto/pyodide) owns the runtime.
     if (typeof qpyodideInstance !== 'undefined') {
       window.mainPyodide = await qpyodideInstance;
-      return;
+      return window.mainPyodide;
     }
-    // coatless already finished
-    if (typeof mainPyodide !== 'undefined') return;
-    // Standalone. Gemeinsames Promise, damit math-exercise und py-exercise auf
-    // derselben Seite nicht zwei Pyodide-Instanzen starten oder sich beim
-    // Laden ins Gehege kommen.
+    if (typeof mainPyodide !== 'undefined' && mainPyodide) return mainPyodide;
+    // Standalone. One shared promise, so math-exercise and py-exercise on the
+    // same page do not start two Pyodide instances. Same protocol as
+    // math-exercise's shared/pyodide-runtime.js.
     var cdnBase = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
     if (!globalThis.__qExercisePyodide) {
       globalThis.__qExercisePyodide = (async function () {
@@ -137,7 +139,29 @@
         return await loadPyodide({ indexURL: cdnBase });
       })();
     }
-    window.mainPyodide = await globalThis.__qExercisePyodide;
+    var pending = globalThis.__qExercisePyodide;
+    try {
+      window.mainPyodide = await pending;
+      return window.mainPyodide;
+    } catch (error) {
+      // Allow a later attempt after a temporary network failure.
+      if (globalThis.__qExercisePyodide === pending) globalThis.__qExercisePyodide = undefined;
+      var failed = document.querySelector('script[src="' + cdnBase + 'pyodide.js"]');
+      if (failed && failed.dataset.qLoaded !== '1') failed.remove();
+      throw error;
+    }
+  }
+
+  // Localized checker messages live in the runtime's namespace; set them for
+  // every run so that a restarted runtime has them too.
+  function setMessages(py) {
+    py.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
+    py.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
+    py.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
+    py.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
+    py.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
+    py.globals.set('_msg_test_error',         L.msgTestError);
+    py.globals.set('_msg_syntax_error',       L.msgSyntaxError);
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
@@ -435,7 +459,7 @@
       editor = monaco.editor.create(editorContainer, {
         value: savedCode !== null ? savedCode : starterCode,
         language: 'python',
-        theme: 'vs-light',
+        theme: 'vs',
         automaticLayout: true,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
@@ -492,13 +516,15 @@
       var studentCode = editor.getValue();
 
       try {
-        mainPyodide.globals.set('_exercise_student_code',  studentCode);
-        mainPyodide.globals.set('_exercise_test_code',     testsCode);
-        mainPyodide.globals.set('_exercise_forbidden_imports',  mainPyodide.toPy(forbiddenImports));
-        mainPyodide.globals.set('_exercise_forbidden_keywords', mainPyodide.toPy(forbiddenKeywords));
+        var py = await ensurePyodide();
+        setMessages(py);
+        py.globals.set('_exercise_student_code',  studentCode);
+        py.globals.set('_exercise_test_code',     testsCode);
+        py.globals.set('_exercise_forbidden_imports',  py.toPy(forbiddenImports));
+        py.globals.set('_exercise_forbidden_keywords', py.toPy(forbiddenKeywords));
 
         if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
-          var violationsRaw = await mainPyodide.runPythonAsync(CHECKER_PY);
+          var violationsRaw = await py.runPythonAsync(CHECKER_PY);
           var violations = JSON.parse(violationsRaw);
           if (violations.length > 0) {
             renderViolations(resultArea, violations);
@@ -507,8 +533,8 @@
           }
         }
 
-        await mainPyodide.loadPackagesFromImports(studentCode);
-        var raw  = await mainPyodide.runPythonAsync(RUNNER_PY);
+        await py.loadPackagesFromImports(studentCode);
+        var raw  = await py.runPythonAsync(RUNNER_PY);
         var data = JSON.parse(raw);
         renderResult(resultArea, data, label, showHints);
         if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {
@@ -669,10 +695,11 @@
     };
 
     try {
-      mainPyodide.globals.set('_submission_payload', mainPyodide.toPy(payload));
-      mainPyodide.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
+      var py = await ensurePyodide();
+      py.globals.set('_submission_payload', py.toPy(payload));
+      py.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
 
-      var encoded = await mainPyodide.runPythonAsync(ENCODER_PY);
+      var encoded = await py.runPythonAsync(ENCODER_PY);
 
       if (outArea)  outArea.value = encoded;
       if (outWrap)  outWrap.style.display = '';
@@ -782,16 +809,12 @@
   // Init
   // ---------------------------------------------------------------------------
   document.addEventListener('DOMContentLoaded', async function () {
-    await ensurePyodide();
+    // Editors appear as soon as Monaco is ready; Python loads in the
+    // background and the first Check waits for it (and reports a failure).
+    ensurePyodide().catch(function (error) {
+      console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
+    });
     await ensureMonaco();
-
-    mainPyodide.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
-    mainPyodide.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
-    mainPyodide.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
-    mainPyodide.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
-    mainPyodide.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
-    mainPyodide.globals.set('_msg_test_error',         L.msgTestError);
-    mainPyodide.globals.set('_msg_syntax_error',       L.msgSyntaxError);
 
     var exercises = window.__pyExercises || [];
     exercises.forEach(setupExercise);
