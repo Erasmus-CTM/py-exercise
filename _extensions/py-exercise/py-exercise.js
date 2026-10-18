@@ -14,6 +14,7 @@
       running:              '⏳ Checking…',
       errorHeader:          '❌ Error in code:',
       unexpectedError:      '❌ Unexpected error:',
+      editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
       stdoutLabel:          'Output:',
       allPassed: function (n) {
         return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
@@ -56,6 +57,7 @@
       running:              '⏳ Überprüfe…',
       errorHeader:          '❌ Fehler im Code:',
       unexpectedError:      '❌ Unerwarteter Fehler:',
+      editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
       stdoutLabel:          'Ausgabe:',
       allPassed: function (n) {
         return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
@@ -155,13 +157,24 @@
   // Localized checker messages live in the runtime's namespace; set them for
   // every run so that a restarted runtime has them too.
   function setMessages(py) {
-    py.globals.set('_msg_forbidden_import',   L.msgForbiddenImport);
-    py.globals.set('_msg_forbidden_function', L.msgForbiddenFunction);
-    py.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod);
-    py.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword);
-    py.globals.set('_msg_assertion_failed',   L.msgAssertionFailed);
-    py.globals.set('_msg_test_error',         L.msgTestError);
-    py.globals.set('_msg_syntax_error',       L.msgSyntaxError);
+    return Promise.all([
+      py.globals.set('_msg_forbidden_import',   L.msgForbiddenImport),
+      py.globals.set('_msg_forbidden_function', L.msgForbiddenFunction),
+      py.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod),
+      py.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword),
+      py.globals.set('_msg_assertion_failed',   L.msgAssertionFailed),
+      py.globals.set('_msg_test_error',         L.msgTestError),
+      py.globals.set('_msg_syntax_error',       L.msgSyntaxError),
+    ]);
+  }
+
+  // All exercises on a page share one Python namespace: each check's
+  // set-globals/evaluate sequence runs as one transaction, in click order.
+  var pythonQueue = Promise.resolve();
+  function pythonTransaction(run) {
+    var result = pythonQueue.then(run);
+    pythonQueue = result.catch(function () {});
+    return result;
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
@@ -172,9 +185,18 @@
       await loadScript(cdnBase + '/loader.js');
     }
     require.config({ paths: { vs: cdnBase } });
-    await new Promise(function (resolve) {
-      require(['vs/editor/editor.main'], resolve);
+    await new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error('Timed out loading the Monaco editor')); }, 60000);
+      require(['vs/editor/editor.main'], function () { clearTimeout(timer); resolve(); },
+        function (error) { clearTimeout(timer); reject(error); });
     });
+  }
+
+  // A script tag that already failed never fires again; do not wait forever.
+  function withTimeout(promise, ms, message) {
+    return Promise.race([promise, new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error(message)); }, ms);
+    })]);
   }
 
   function escapeHtml(str) {
@@ -501,11 +523,18 @@
         }, 500);
       });
 
-      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck);
+      // addCommand registers a global keybinding (the last registration wins),
+      // so bind Shift+Enter to this exercise whenever its editor gains focus.
+      var bindCheckKey = function () { editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck); };
+      editor.onDidFocusEditorText(bindCheckKey);
+      bindCheckKey();
     });
 
+    var running = false;
     async function runCheck() {
-      if (!editor) return;
+      // Shift+Enter bypasses the disabled button; never queue duplicates.
+      if (!editor || running) return;
+      running = true;
       feedbackAdapter?.reset('run');
       clearFeedback();
 
@@ -516,26 +545,28 @@
       var studentCode = editor.getValue();
 
       try {
-        var py = await ensurePyodide();
-        setMessages(py);
-        py.globals.set('_exercise_student_code',  studentCode);
-        py.globals.set('_exercise_test_code',     testsCode);
-        py.globals.set('_exercise_forbidden_imports',  py.toPy(forbiddenImports));
-        py.globals.set('_exercise_forbidden_keywords', py.toPy(forbiddenKeywords));
-
-        if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
-          var violationsRaw = await py.runPythonAsync(CHECKER_PY);
-          var violations = JSON.parse(violationsRaw);
-          if (violations.length > 0) {
-            renderViolations(resultArea, violations);
-            if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
-            return;
+        var outcome = await pythonTransaction(async function () {
+          var py = await ensurePyodide();
+          await setMessages(py);
+          await Promise.all([
+            py.globals.set('_exercise_student_code',  studentCode),
+            py.globals.set('_exercise_test_code',     testsCode),
+            py.globals.set('_exercise_forbidden_imports',  py.toPy(forbiddenImports)),
+            py.globals.set('_exercise_forbidden_keywords', py.toPy(forbiddenKeywords)),
+          ]);
+          if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
+            var violations = JSON.parse(await py.runPythonAsync(CHECKER_PY));
+            if (violations.length > 0) return { violations: violations };
           }
+          await py.loadPackagesFromImports(studentCode);
+          return { data: JSON.parse(await py.runPythonAsync(RUNNER_PY)) };
+        });
+        if (outcome.violations) {
+          renderViolations(resultArea, outcome.violations);
+          if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
+          return;
         }
-
-        await py.loadPackagesFromImports(studentCode);
-        var raw  = await py.runPythonAsync(RUNNER_PY);
-        var data = JSON.parse(raw);
+        var data = outcome.data;
         renderResult(resultArea, data, label, showHints);
         if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {
           status: data.student_error ? 'learner code raised an error' : 'checked',
@@ -551,6 +582,7 @@
           '<pre>' + escapeHtml(String(err)) + '</pre>' +
           '</div>';
       } finally {
+        running = false;
         checkBtn.disabled = false;
         resetBtn.disabled = false;
       }
@@ -695,11 +727,14 @@
     };
 
     try {
-      var py = await ensurePyodide();
-      py.globals.set('_submission_payload', py.toPy(payload));
-      py.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise');
-
-      var encoded = await py.runPythonAsync(ENCODER_PY);
+      var encoded = await pythonTransaction(async function () {
+        var py = await ensurePyodide();
+        await Promise.all([
+          py.globals.set('_submission_payload', py.toPy(payload)),
+          py.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise'),
+        ]);
+        return py.runPythonAsync(ENCODER_PY);
+      });
 
       if (outArea)  outArea.value = encoded;
       if (outWrap)  outWrap.style.display = '';
@@ -814,7 +849,20 @@
     ensurePyodide().catch(function (error) {
       console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
     });
-    await ensureMonaco();
+    try {
+      await withTimeout(ensureMonaco(), 60000, 'Timed out loading the Monaco editor');
+    } catch (error) {
+      console.warn('py-exercise: the code editor could not be loaded:', error);
+      (window.__pyExercises || []).forEach(function (exercise) {
+        var container = document.getElementById('py-exercise-' + exercise.id);
+        if (!container) return;
+        var message = document.createElement('div');
+        message.className = 'py-exercise-error';
+        message.textContent = L.editorUnavailable;
+        container.replaceChildren(message);
+      });
+      return;
+    }
 
     var exercises = window.__pyExercises || [];
     exercises.forEach(setupExercise);

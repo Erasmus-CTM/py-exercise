@@ -7,3 +7,4 @@
 /_extensions/*/ai-feedback/
 /_feedback-source/
 __pycache__/
+node_modules/

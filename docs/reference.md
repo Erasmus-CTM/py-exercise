@@ -42,7 +42,7 @@ Everything **below** is hidden and checked automatically after running the code.
 | `label` | String | `py-exercise-N` | Unique ID of the exercise |
 | `caption` | String | — | Name stored with the exercise in the JSON download; it is not displayed on the page |
 | `forbidden-imports` | comma-separated | — | Forbidden `import` statements (top-level module name) |
-| `forbidden-keywords` | comma-separated | — | Forbidden calls such as `sum` or `.sort`, and the statements `for`, `while`, `with`, `lambda`, `class`, `global`, `nonlocal`, `try`, `raise`, `del`, `assert`, `yield` |
+| `forbidden-keywords` | comma-separated | — | Forbidden function or method names such as `sum` or `sort` (`sort` forbids both `sort(x)` and `x.sort()`; write names without a leading dot), and the statements `for`, `while`, `with`, `lambda`, `class`, `global`, `nonlocal`, `try`, `raise`, `del`, `assert`, `yield` |
 | `show-test-hints` | `true` / `false` | `true` | Show the assertion message on failure |
 
 ---

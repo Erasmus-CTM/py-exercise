@@ -70,7 +70,8 @@ local function readFile(filename)
   local path = quarto.utils.resolve_path(filename)
   local f = io.open(path, "r")
   if not f then
-    error("py-exercise: cannot open '" .. filename ..
+    -- assert: Quarto replaces error() with a logger that does not stop the render.
+    assert(false, "py-exercise: cannot open '" .. filename ..
           "' – make sure it is present in the _extensions/py-exercise/ directory.")
   end
   local content = f:read("*a")
@@ -259,7 +260,7 @@ local function CodeBlock(el)
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
   if feedbackEnabled and (not opts["task"] or opts["task"] == "") then
-    error("py-exercise: shared feedback requires #| task: with the learner's assignment.")
+    assert(false, "py-exercise: shared feedback requires #| task: with the learner's assignment.")
   end
 
   local cellForbiddenImports  = splitCommaList(opts["forbidden-imports"])
