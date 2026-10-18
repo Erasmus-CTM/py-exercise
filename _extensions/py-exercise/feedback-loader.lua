@@ -115,5 +115,22 @@ function M.feedback()
   return shared
 end
 
+-- Seconds after which a running check offers Stop (worker runtimes only):
+-- `<component>: stop-after:` for one component, `ctm-assessment: stop-after:`
+-- for all components of a project; default 20.
+function M.stopAfter(meta, component)
+  for _, key in ipairs({component, "ctm-assessment"}) do
+    local cfg = meta[key]
+    local value = type(cfg) == "table" and cfg["stop-after"] or nil
+    if value ~= nil then
+      local seconds = tonumber(pandoc.utils.stringify(value))
+      assert(seconds and seconds > 0, key .. ": stop-after must be a number of seconds greater than 0 (found "
+        .. pandoc.utils.stringify(value) .. ")")
+      return seconds
+    end
+  end
+  return 20
+end
+
 -- `dofile("feedback-loader.lua")()` keeps loading ai-feedback, as before.
 return setmetatable(M, {__call = function() return M.feedback() end})

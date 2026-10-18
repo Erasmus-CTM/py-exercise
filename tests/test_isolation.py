@@ -58,6 +58,12 @@ class Isolation(unittest.TestCase):
         self.assertFalse(result['tests'][0]['passed'])
         self.assertIn('leftover', result['tests'][0]['message'])
 
+    def test_main_blocks_do_not_run_during_a_check(self):
+        code = 'def add(a, b):\n    return a + b\nif __name__ == "__main__":\n    input("number: ")'
+        result = self.module.run(code, 'assert add(1, 2) == 3', harness.MESSAGES)
+        self.assertIsNone(result['student_error'])
+        self.assertEqual(result['tests'], [{'passed': True}])
+
     def test_exit_in_learner_code_or_tests_is_reported_not_raised(self):
         result = self.module.run('import sys\nsys.exit(3)', 'assert True', harness.MESSAGES)
         self.assertIn('SystemExit', result['student_error'])

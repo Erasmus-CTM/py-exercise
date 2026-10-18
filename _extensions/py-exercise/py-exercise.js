@@ -221,7 +221,7 @@
     '    return found',
     '',
     'def run(code, tests, messages):',
-    '    namespace = {"__name__": "__main__"}',
+    '    namespace = {}  # as before 0.3: __name__ is not "__main__", so main() blocks do not run',
     '    results = {"student_error": None, "stdout": "", "tests": []}',
     '    state = _ctm_guard.snapshot() if _ctm_guard else None',
     '    buffer = _io.StringIO()',
@@ -495,9 +495,11 @@
       resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
       // A runtime in a worker (pyodide-interaktiv) can be stopped; Python on
       // the page itself cannot, the page then only reloads.
-      var stopped = false;
-      var slowTimer = setTimeout(function () {
-        if (!globalThis.MathExerciseRuntime.canStop()) return;
+      // `py-exercise: stop-after:` / `ctm-assessment: stop-after:` (default 20 s).
+      var runtime = globalThis.MathExerciseRuntime;
+      var stops = runtime.stopCount();
+      var cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
+          (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
         var note = resultArea.querySelector('.py-exercise-running');
         if (!note) return;
         note.textContent = L.slowCheck + ' ';
@@ -505,12 +507,9 @@
         stopBtn.type = 'button';
         stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
         stopBtn.textContent = L.stop;
-        stopBtn.addEventListener('click', function () {
-          stopped = true;
-          globalThis.MathExerciseRuntime.stop('Stopped by the learner');
-        });
+        stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
         note.appendChild(stopBtn);
-      }, (window.__pyExerciseSlowCheckMs || 10000));
+      });
       checkBtn.disabled = true;
       resetBtn.disabled = true;
 
@@ -541,7 +540,8 @@
         }};
 
       } catch (err) {
-        resultArea.innerHTML = stopped
+        // Stopped from this or any other component's Stop button.
+        resultArea.innerHTML = runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
           : runtimeUnavailable(err)
           ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
@@ -550,7 +550,7 @@
             '<pre>' + escapeHtml(String(err)) + '</pre>' +
             '</div>';
       } finally {
-        clearTimeout(slowTimer);
+        cancelSlow();
         running = false;
         checkBtn.disabled = false;
         resetBtn.disabled = false;

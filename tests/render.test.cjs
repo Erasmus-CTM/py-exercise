@@ -50,3 +50,12 @@ test('feedback needs the task; text activities are prepared even with exercise f
   assert.match(r.html, /ai-feedback-activity/);
   assert.doesNotMatch(r.html, /py-exercise-feedback/);
 });
+
+test('with exercise feedback off, hidden callouts stay out of an activity context', { skip: skip || (!feedback && 'AI_FEEDBACK_EXTENSION not set') }, () => {
+  const body = '::: {.callout-tip .ai-feedback-ignore}\nSECRET SOLUTION 42\n:::\n\n::: {.ai-feedback}\nExplain.\n:::\n';
+  const r = render('', exercise + '\n' + body, { withFeedback: true });
+  assert.equal(r.status, 0, r.stderr);
+  const data = [...r.html.matchAll(/class="ai-feedback-data"[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).join('\n');
+  assert.ok(data.length > 0, 'activity data present');
+  assert.doesNotMatch(data, /SECRET SOLUTION/);
+});

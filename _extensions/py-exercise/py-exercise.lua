@@ -1,4 +1,16 @@
 local feedback = nil
+-- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
+local dependencies = nil
+local function deps()
+  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
+  return dependencies
+end
+
+-- Decided per page in the first pass: load ai-feedback for exercise feedback
+-- or for `.ai-feedback` activities on the page; nothing otherwise.
+local needFeedback = false
+-- Seconds after which a running check offers Stop (stop-after).
+local stopAfter = 20
 ----
 -- py-exercise.lua
 --
@@ -173,6 +185,7 @@ local function ensureExerciseSetup()
     submissionKey = submissionKey,
     lang          = lang,
     feedback      = feedbackEnabled,
+    stopAfter     = stopAfter,
   }
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
@@ -225,6 +238,7 @@ local function Meta(meta)
   -- Quarto's `lang:` and have no `py-exercise:` block, so this happens before
   -- the early return below.
   lang = resolveLang(meta)
+  stopAfter = deps().stopAfter(meta, "py-exercise")
 
   if not meta["py-exercise"] then return meta end
   local cfg = meta["py-exercise"]
@@ -308,29 +322,25 @@ local function CodeBlock(el)
   return pandoc.RawBlock("html", html)
 end
 
--- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
-local dependencies = nil
-local function deps()
-  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
-  return dependencies
-end
-
 return {
   { Meta = Meta },
+  -- A page that uses a missing optional extension stops here; then decide
+  -- whether ai-feedback is needed, before callouts are marked for it.
+  { Pandoc = function(doc)
+      if not quarto.doc.is_format("html") then return doc end
+      deps().requireUsed(doc, "py-exercise")
+      needFeedback = feedbackEnabled or deps().uses(doc)["ai-feedback"] == true
+      return doc
+    end },
   { Callout = function(c)
-      if feedbackEnabled and quarto.doc.is_format("html") then
+      if needFeedback and quarto.doc.is_format("html") then
         feedback = feedback or deps().feedback()
         return feedback.markCallout(c)
       end
       return c
     end },
   { Pandoc = function(doc)
-      if not quarto.doc.is_format("html") then return doc end
-      -- A page that uses a missing optional extension stops here; ai-feedback
-      -- is loaded only when exercise feedback is on or the page has
-      -- `.ai-feedback` activities.
-      deps().requireUsed(doc, "py-exercise")
-      if feedbackEnabled or deps().uses(doc)["ai-feedback"] then
+      if needFeedback and quarto.doc.is_format("html") then
         feedback = feedback or deps().feedback()
         return feedback.prepare(doc)
       end

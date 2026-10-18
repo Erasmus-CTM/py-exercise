@@ -285,8 +285,10 @@ determined learner can read them or fake a result. Use it for practice, not
 for high-stakes assessment. A program that never ends (an endless loop) cannot
 be interrupted when Python runs on the page itself; the page has to be
 reloaded. When pyodide-interaktiv is on the page, Python runs in a worker: a
-check that runs longer than 10 s offers **Stop**, which restarts Python for the
-whole page.
+check that runs longer than 20 s offers **Stop**, which restarts Python for the
+whole page. Change the time with `py-exercise: {stop-after: 30}` (seconds), or
+for all CTM components of a project with `ctm-assessment: {stop-after: 30}`.
+As before, `if __name__ == "__main__":` blocks do not run during a check.
 
 `_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
 of math-exercise's file of the same name (the CTM Assessment build checks

@@ -24,7 +24,7 @@ function fakeInterpreter() {
     loadPackagesFromImports: async () => {},
     modules,
     runPythonAsync: async code => {
-      if (code.includes('_ctm_module_source')) { modules.add(code.match(/ModuleType\("([^"]+)"\)/)[1]); globals.delete('_ctm_module_source'); return undefined; }
+      if (code.includes('ModuleType(')) { modules.add(code.match(/ModuleType\("([^"]+)"\)/)[1]); return undefined; }
       await tick(5);
       if (!modules.has('_ctm_py_exercise')) throw new Error("ModuleNotFoundError: No module named '_ctm_py_exercise'");
       const request = JSON.parse(globals.get('_ctm_py_request')); globals.delete('_ctm_py_request');
@@ -184,5 +184,28 @@ test('a long check in a worker runtime offers Stop, and stopping is reported', a
   await until(() => /Stopped/.test(result(w, 1)));
   assert.equal(restarts, 1);
   assert.equal(w.document.querySelector('.py-exercise-check').disabled, false);
+  dom.window.close();
+});
+
+test('a Stop from another component is reported as stopped, and queued checks then run', async () => {
+  const { w, dom } = page(exercises());
+  w.__pyExerciseSlowCheckMs = 30;
+  const interpreter = fakeInterpreter();
+  const pending = [];
+  const run = interpreter.runPythonAsync;
+  let restarted = false;
+  interpreter.runPythonAsync = code => code.includes('.call(globals())') && !restarted ? new Promise((_, r) => pending.push(r)) : run(code);
+  interpreter.restart = () => { restarted = true; pending.splice(0).forEach(r => r(new Error('Python was restarted.'))); };
+  w.qpyodideInstance = Promise.resolve(interpreter);
+  w.eval(source);
+  await until(() => w.document.querySelectorAll('.py-exercise-check').length === 2);
+  await tick(20);
+  const [a, b] = w.document.querySelectorAll('.py-exercise-check');
+  a.click(); b.click();
+  await until(() => w.document.querySelector('.py-exercise-stop'));
+  w.MathExerciseRuntime.stop('another component');   // as math-exercise's Stop would
+  // The running check reports the stop; the one queued behind it then runs normally.
+  await until(() => /Stopped/.test(result(w, 1)) && /0 of 1|passed/.test(result(w, 2)));
+  assert.doesNotMatch(result(w, 1) + result(w, 2), /Unexpected error/);
   dom.window.close();
 });

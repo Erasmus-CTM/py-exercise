@@ -116,46 +116,59 @@
     '        "hooks": (_sys.displayhook, _sys.excepthook),',
     '        "recursion": _sys.getrecursionlimit(),',
     '        "path": list(_sys.path),',
+    '        "path_list": _sys.path,',
     '        "cwd": _os.getcwd(),',
     '        "modules": {k: v for k, v in _sys.modules.items() if k.startswith("_ctm_")},',
     '    }',
     '',
     'def restore(state):',
-    '    current = _builtins.__dict__',
-    '    for key in [k for k in current if k not in state["builtins"]]:',
-    '        del current[key]',
-    '    for key, value in state["builtins"].items():',
-    '        if current.get(key, _MISSING) is not value:',
-    '            current[key] = value',
-    '    _sys.stdin, _sys.stdout, _sys.stderr = state["streams"]',
-    '    _sys.displayhook, _sys.excepthook = state["hooks"]',
-    '    _sys.setrecursionlimit(state["recursion"])',
-    '    _sys.path[:] = state["path"]',
-    '    try:',
-    '        _os.chdir(state["cwd"])',
-    '    except OSError:',
-    '        pass',
-    '    _sys.modules.update(state["modules"])',
+    '    # Each item on its own: one that fails must not leave the others changed.',
+    '    def builtins_():',
+    '        current = _builtins.__dict__',
+    '        for key in [k for k in current if k not in state["builtins"]]:',
+    '            del current[key]',
+    '        for key, value in state["builtins"].items():',
+    '            if current.get(key, _MISSING) is not value:',
+    '                current[key] = value',
+    '    def streams():',
+    '        _sys.stdin, _sys.stdout, _sys.stderr = state["streams"]',
+    '        _sys.displayhook, _sys.excepthook = state["hooks"]',
+    '    def path():',
+    '        _sys.path = state["path_list"]',
+    '        _sys.path[:] = state["path"]',
+    '    for step in (builtins_, streams, lambda: _sys.setrecursionlimit(state["recursion"]), path,',
+    '                 lambda: _os.chdir(state["cwd"]), lambda: _sys.modules.update(state["modules"])):',
+    '        try:',
+    '            step()',
+    '        except Exception:',
+    '            pass',
   ].join('\n');
 
   // Installs a Python source as a private module (not in the interpreter's
-  // global namespace, which learner code shares), once per runtime.
+  // global namespace, which learner code shares), once per runtime. Calls for
+  // the same module share one install; each module passes its source under
+  // its own name, so concurrent installs of different modules cannot mix.
   var installed = typeof WeakMap === 'function' ? new WeakMap() : null;
-  async function installModule(py, name, source) {
+  function installModule(py, name, source) {
     var done = installed && installed.get(py);
-    if (done && done[name]) return;
-    await py.globals.set('_ctm_module_source', source);
-    await py.runPythonAsync([
-      'import sys as _ctm_sys, types as _ctm_types',
-      '_ctm_module = _ctm_types.ModuleType("' + name + '")',
-      'exec(_ctm_module_source, _ctm_module.__dict__)',
-      '_ctm_sys.modules["' + name + '"] = _ctm_module',
-      'del _ctm_sys, _ctm_types, _ctm_module, _ctm_module_source',
-    ].join('\n'));
+    if (done && done[name]) return done[name];
+    var variable = '_ctm_source_' + name.replace(/[^A-Za-z0-9_]/g, '_');
+    var install = (async function () {
+      await py.globals.set(variable, source);
+      await py.runPythonAsync([
+        'import sys as _ctm_sys, types as _ctm_types',
+        '_ctm_module = _ctm_types.ModuleType("' + name + '")',
+        'exec(' + variable + ', _ctm_module.__dict__)',
+        '_ctm_sys.modules["' + name + '"] = _ctm_module',
+        'del _ctm_sys, _ctm_types, _ctm_module, ' + variable,
+      ].join('\n'));
+    })();
     if (installed) {
       if (!done) { done = {}; installed.set(py, done); }
-      done[name] = true;
+      done[name] = install;
+      install.catch(function () { if (done[name] === install) delete done[name]; });
     }
+    return install;
   }
   // Forget installed modules of a runtime (for example after learner code in
   // another cell removed them); the next install runs again.
@@ -168,8 +181,28 @@
     var py = root.mainPyodide;
     return !!(py && typeof py.restart === 'function');
   }
+  // Stops are page-wide: every component compares `stops` before and after a
+  // run, so a check stopped from any button is neither repeated nor shown as
+  // an unexpected error.
+  var stops = 0;
   function stop(reason) {
-    if (canStop()) root.mainPyodide.restart(reason || 'Stopped by the learner');
+    if (!canStop()) return;
+    stops++;
+    root.mainPyodide.restart(reason || 'Stopped by the learner');
+  }
+  function stopCount() { return stops; }
+  // Calls onSlow once when a run has taken `ms` and the runtime can be
+  // stopped (a worker that is still starting becomes stoppable later).
+  // Returns a function that cancels it.
+  function whenSlow(ms, onSlow) {
+    var timer = null, cancelled = false;
+    function check() {
+      if (cancelled) return;
+      if (canStop()) { onSlow(); return; }
+      timer = setTimeout(check, 1000);
+    }
+    timer = setTimeout(check, ms);
+    return function () { cancelled = true; clearTimeout(timer); };
   }
 
   root.MathExerciseRuntime = {
@@ -181,6 +214,8 @@
     forgetModules: forgetModules,
     ensureGuard: ensureGuard,
     canStop: canStop,
-    stop: stop
+    stop: stop,
+    stopCount: stopCount,
+    whenSlow: whenSlow
   };
 })(globalThis);
