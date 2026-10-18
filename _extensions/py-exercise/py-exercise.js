@@ -476,7 +476,10 @@
 
       // addCommand registers a global keybinding (the last registration wins),
       // so bind Shift+Enter to this exercise whenever its editor gains focus.
-      var bindCheckKey = function () { editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck); };
+      // The context key keeps it out of other Monaco editors on the page.
+      var keyContext = typeof editor.createContextKey === 'function'
+        ? (editor.createContextKey('pyExerciseEditor', true), 'pyExerciseEditor') : undefined;
+      var bindCheckKey = function () { editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck, keyContext); };
       editor.onDidFocusEditorText(bindCheckKey);
       bindCheckKey();
     });
