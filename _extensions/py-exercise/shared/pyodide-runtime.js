@@ -4,7 +4,9 @@
 (function (root) {
   'use strict';
 
-  if (root.MathExerciseRuntime) return;
+  // An older copy (another component's release) may have loaded first; a
+  // copy with the current interface replaces it (shared state lives on root).
+  if (root.MathExerciseRuntime && typeof root.MathExerciseRuntime.whenSlow === 'function') return;
 
   var indexURL = 'https://cdn.jsdelivr.net/pyodide/v0.27.2/full/';
   var LOAD_TIMEOUT = root.__qExercisePyodideTimeout || 180000; // override for tests
@@ -201,7 +203,7 @@
       if (canStop()) { onSlow(); return; }
       timer = setTimeout(check, 1000);
     }
-    timer = setTimeout(check, ms);
+    timer = setTimeout(check, Math.min(ms, 2147483647));  // larger delays overflow to 0
     return function () { cancelled = true; clearTimeout(timer); };
   }
 

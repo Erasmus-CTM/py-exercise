@@ -209,3 +209,22 @@ test('a Stop from another component is reported as stopped, and queued checks th
   assert.doesNotMatch(result(w, 1) + result(w, 2), /Unexpected error/);
   dom.window.close();
 });
+
+test('a check interrupted by an interactive cell restart is repeated once', async () => {
+  const { w, dom } = page(exercises().slice(0, 1));
+  const interpreter = fakeInterpreter();
+  let interrupted = false;
+  const run = interpreter.runPythonAsync;
+  interpreter.runPythonAsync = async code => {
+    if (code.includes('.call(globals())') && !interrupted) { interrupted = true; throw new Error('Aborted – Python was restarted'); }
+    return run(code);
+  };
+  w.qpyodideInstance = Promise.resolve(interpreter);
+  w.eval(source);
+  await until(() => w.document.querySelector('.py-exercise-check'));
+  await tick(20);
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => /passed|error/i.test(result(w, 1)));
+  assert.match(result(w, 1), /All 1 test passed/);
+  dom.window.close();
+});

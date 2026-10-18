@@ -59,3 +59,15 @@ test('with exercise feedback off, hidden callouts stay out of an activity contex
   assert.ok(data.length > 0, 'activity data present');
   assert.doesNotMatch(data, /SECRET SOLUTION/);
 });
+
+test('stop-after reaches the page, per component or for all components', { skip }, () => {
+  let r = render('', exercise);
+  assert.match(r.html, /"stopAfter":20/);
+  r = render('ctm-assessment:\n  stop-after: 9\n', exercise);
+  assert.match(r.html, /"stopAfter":9/);
+  r = render('ctm-assessment:\n  stop-after: 9\npy-exercise:\n  stop-after: 7\n', exercise);
+  assert.match(r.html, /"stopAfter":7/);
+  r = render('py-exercise:\n  stop-after: 0\n', exercise);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /stop-after must be a number of seconds/);
+});

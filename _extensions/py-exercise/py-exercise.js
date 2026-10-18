@@ -497,34 +497,46 @@
       // the page itself cannot, the page then only reloads.
       // `py-exercise: stop-after:` / `ctm-assessment: stop-after:` (default 20 s).
       var runtime = globalThis.MathExerciseRuntime;
-      var stops = runtime.stopCount();
-      var cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
-          (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
-        var note = resultArea.querySelector('.py-exercise-running');
-        if (!note) return;
-        note.textContent = L.slowCheck + ' ';
-        var stopBtn = document.createElement('button');
-        stopBtn.type = 'button';
-        stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
-        stopBtn.textContent = L.stop;
-        stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
-        note.appendChild(stopBtn);
-      });
+      var stops = null, cancelSlow = function () {};
       checkBtn.disabled = true;
       resetBtn.disabled = true;
 
       var studentCode = editor.getValue();
 
       try {
-        var outcome = await pythonTransaction(async function () {
-          var py = await ensurePyodide();
-          if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
-            var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
-            if (violations.length > 0) return { violations: violations };
-          }
-          await py.loadPackagesFromImports(studentCode);
-          return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
+        stops = runtime.stopCount();
+        cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
+            (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
+          var note = resultArea.querySelector('.py-exercise-running');
+          if (!note) return;
+          note.textContent = L.slowCheck + ' ';
+          var stopBtn = document.createElement('button');
+          stopBtn.type = 'button';
+          stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
+          stopBtn.textContent = L.stop;
+          stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
+          note.appendChild(stopBtn);
         });
+        var check = function () {
+          return pythonTransaction(async function () {
+            var py = await ensurePyodide();
+            if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
+              var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
+              if (violations.length > 0) return { violations: violations };
+            }
+            await py.loadPackagesFromImports(studentCode);
+            return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
+          });
+        };
+        var outcome;
+        try {
+          outcome = await check();
+        } catch (error) {
+          // Python restarted by other means (an interactive cell's Stop or
+          // restart): repeat the check once on the new runtime, as math-exercise does.
+          if (runtime.stopCount() !== stops || !/restarted/i.test(String(error))) throw error;
+          outcome = await check();
+        }
         if (outcome.violations) {
           renderViolations(resultArea, outcome.violations);
           if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
@@ -541,7 +553,7 @@
 
       } catch (err) {
         // Stopped from this or any other component's Stop button.
-        resultArea.innerHTML = runtime.stopCount() !== stops
+        resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
           : runtimeUnavailable(err)
           ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'

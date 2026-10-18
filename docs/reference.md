@@ -288,7 +288,9 @@ reloaded. When pyodide-interaktiv is on the page, Python runs in a worker: a
 check that runs longer than 20 s offers **Stop**, which restarts Python for the
 whole page. Change the time with `py-exercise: {stop-after: 30}` (seconds), or
 for all CTM components of a project with `ctm-assessment: {stop-after: 30}`.
-As before, `if __name__ == "__main__":` blocks do not run during a check.
+A check interrupted by an interactive cell's Stop or restart is repeated once
+on the new runtime. As before, `if __name__ == "__main__":` blocks do not run
+during a check.
 
 `_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
 of math-exercise's file of the same name (the CTM Assessment build checks

@@ -52,6 +52,14 @@ class Isolation(unittest.TestCase):
         self.assertEqual(sys.getrecursionlimit(), limit)
         self.assertIs(sys.modules['_ctm_other_component'], self.other)
 
+    def test_a_failing_restore_step_does_not_stop_the_others(self):
+        path, limit = sys.path, sys.getrecursionlimit()
+        code = 'import sys\nsys.path = "/tmp"\nsys.setrecursionlimit(100)\ndel sys.modules["_ctm_other_component"]'
+        self.module.run(code, 'assert True', harness.MESSAGES)
+        self.assertIs(sys.path, path)
+        self.assertEqual(sys.getrecursionlimit(), limit)
+        self.assertIs(sys.modules['_ctm_other_component'], self.other)
+
     def test_every_check_starts_from_a_fresh_namespace(self):
         self.module.run('leftover = 1\ndef add(a, b):\n    return a + b', 'assert add(1, 2) == 3', harness.MESSAGES)
         result = self.module.run('def add(a, b):\n    return leftover', 'assert add(1, 2) == 3', harness.MESSAGES)
