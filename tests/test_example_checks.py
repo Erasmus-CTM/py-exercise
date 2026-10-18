@@ -1,7 +1,7 @@
 """Challenge the published examples with correct and plausible wrong programs.
 
-The checks run through the same Python the browser runs: RUNNER_PY and
-CHECKER_PY are read from _extensions/py-exercise/py-exercise.js, so each
+The checks run through the same Python the browser runs: MODULE_PY is read
+from _extensions/py-exercise/py-exercise.js, so each
 top-level test statement is graded separately in the learner's namespace,
 exactly as on the page.
 """
@@ -10,6 +10,7 @@ import base64
 import contextlib
 import io
 import json
+import types
 from pathlib import Path
 import re
 import textwrap
@@ -18,13 +19,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = (ROOT / '_extensions/py-exercise/py-exercise.js').read_text(encoding='utf-8')
 MESSAGES = {
-    '_msg_forbidden_import': "Forbidden import: '{}'",
-    '_msg_forbidden_function': "Forbidden function: '{}'",
-    '_msg_forbidden_method': "Forbidden method: '.{}'",
-    '_msg_forbidden_keyword': "Forbidden keyword: '{}'",
-    '_msg_assertion_failed': 'Assertion failed',
-    '_msg_test_error': 'Error: {}',
-    '_msg_syntax_error': 'Syntax error in tests: {}',
+    'forbidden_import': "Forbidden import: '{}'",
+    'forbidden_function': "Forbidden function: '{}'",
+    'forbidden_method': "Forbidden method: '.{}'",
+    'forbidden_keyword': "Forbidden keyword: '{}'",
+    'assertion_failed': 'Assertion failed',
+    'test_error': 'Error: {}',
+    'syntax_error': 'Syntax error in tests: {}',
 }
 
 
@@ -34,28 +35,24 @@ def browser_python(name):
     return '\n'.join(ast.literal_eval(line.strip().rstrip(',')) for line in body.splitlines() if line.strip())
 
 
-def run_snippet(code, namespace):
-    """Like pyodide.runPythonAsync: execute, then return the last expression's value."""
-    body, last = code.rstrip().rsplit('\n', 1)
-    exec(compile(body, '<pyodide>', 'exec'), namespace)
-    return eval(compile(last, '<pyodide>', 'eval'), namespace)
+def browser_module():
+    """The private module py-exercise.js installs in Pyodide (MODULE_PY)."""
+    module = types.ModuleType('_ctm_py_exercise')
+    exec(browser_python('MODULE_PY'), module.__dict__)
+    return module
 
 
-CHECKER, RUNNER = browser_python('CHECKER_PY'), browser_python('RUNNER_PY')
+MODULE = browser_module()
 
 
 def check(exercise, learner_code):
     """Return 'blocked', 'error', 'pass' or 'fail' as the page would show it."""
-    namespace = dict(MESSAGES, __name__='__main__', _exercise_student_code=learner_code,
-                     _exercise_test_code=exercise['tests'],
-                     _exercise_forbidden_imports=exercise['forbidden-imports'],
-                     _exercise_forbidden_keywords=exercise['forbidden-keywords'])
     if exercise['forbidden-imports'] or exercise['forbidden-keywords']:
-        if json.loads(run_snippet(CHECKER, namespace)):
+        if MODULE.violations(learner_code, exercise['forbidden-imports'], exercise['forbidden-keywords'], MESSAGES):
             return 'blocked'
     # Output printed while tests run goes to the page console; keep it out of the test log.
     with contextlib.redirect_stdout(io.StringIO()):
-        result = json.loads(run_snippet(RUNNER, namespace))
+        result = MODULE.run(learner_code, exercise['tests'], MESSAGES)
     if result['student_error']:
         return 'error'
     tests = result['tests']
@@ -207,10 +204,9 @@ class DocumentedExamples(unittest.TestCase):
                     self.assertEqual(check(exercise, exercise['starter']), 'fail')
 
     def test_documented_decoder_reads_an_exported_submission(self):
-        encoder = browser_python('ENCODER_PY')
         payload = {'v': 1, 'sid': 's123 Øyvind', 'qid': 'quiz-01', 'ts': 't',
                    'results': [{'label': 'add', 'passed': 3, 'total': 3, 'tests': [True, True, True]}]}
-        encoded = run_snippet(encoder, {'_submission_payload': payload, '_submission_key': 'demo-key-2026'})
+        encoded = MODULE.encode(payload, 'demo-key-2026')
         decoder = re.search(r'```python\n(import json, base64.*?)\ndata = ', (ROOT / 'docs/reference.md').read_text(), re.S).group(1)
         script = (ROOT / 'decode.py').read_text().split('\nkey = input(')[0]
         for source in (decoder, script):

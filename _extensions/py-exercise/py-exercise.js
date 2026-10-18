@@ -16,6 +16,9 @@
       unexpectedError:      '❌ Unexpected error:',
       editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
       pythonUnavailable:    'Python could not be loaded (no connection to cdn.jsdelivr.net?). Check the connection and press Check again.',
+      slowCheck:            'Still running – an endless loop?',
+      stop:                 'Stop',
+      stopped:              'Stopped. Python was restarted (interactive cells on this page lost their variables).',
       stdoutLabel:          'Output:',
       allPassed: function (n) {
         return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
@@ -60,6 +63,9 @@
       unexpectedError:      '❌ Unerwarteter Fehler:',
       editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
       pythonUnavailable:    'Python konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Prüfe die Verbindung und klicke erneut auf Überprüfen.',
+      slowCheck:            'Läuft noch – eine Endlosschleife?',
+      stop:                 'Abbrechen',
+      stopped:              'Abgebrochen. Python wurde neu gestartet (interaktive Zellen auf dieser Seite haben ihre Variablen verloren).',
       stdoutLabel:          'Ausgabe:',
       allPassed: function (n) {
         return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
@@ -110,19 +116,6 @@
     return error && (error.code === 'pyodide-timeout' || /^Failed to load: https?:/.test(String(error.message || '')));
   }
 
-  // Localized checker messages live in the runtime's namespace; set them for
-  // every run so that a restarted runtime has them too.
-  function setMessages(py) {
-    return Promise.all([
-      py.globals.set('_msg_forbidden_import',   L.msgForbiddenImport),
-      py.globals.set('_msg_forbidden_function', L.msgForbiddenFunction),
-      py.globals.set('_msg_forbidden_method',   L.msgForbiddenMethod),
-      py.globals.set('_msg_forbidden_keyword',  L.msgForbiddenKeyword),
-      py.globals.set('_msg_assertion_failed',   L.msgAssertionFailed),
-      py.globals.set('_msg_test_error',         L.msgTestError),
-      py.globals.set('_msg_syntax_error',       L.msgSyntaxError),
-    ]);
-  }
 
   // All exercises on a page share one Python namespace: each check's
   // set-globals/evaluate sequence runs as one transaction, in click order.
@@ -175,124 +168,128 @@
   var exerciseEditors = {};
 
   // ---------------------------------------------------------------------------
-  // Python: AST-based violation checker
+  // Python: the checker, runner and encoder live in a private module
+  // (_ctm_py_exercise), not in the interpreter's global namespace, which
+  // pyodide-interaktiv cells use like a notebook. Every check runs the
+  // learner's code in a fresh namespace; interpreter state it changes
+  // (builtins, sys.stdout, recursion limit, ...) is restored afterwards
+  // (_ctm_guard, shared/pyodide-runtime.js).
   // ---------------------------------------------------------------------------
-  var CHECKER_PY = [
-    'import ast as _ast, json as _json',
-    '',
-    '_fi = list(_exercise_forbidden_imports)',
-    '_fk = list(_exercise_forbidden_keywords)',
+  var PY_MODULE = '_ctm_py_exercise';
+  var MODULE_PY = [
+    'import ast as _ast, io as _io, json as _json, base64 as _b64, sys as _sys, traceback as _traceback',
+    'try:',
+    '    import _ctm_guard',
+    'except ImportError:  # native test runners',
+    '    _ctm_guard = None',
     '',
     '_KW_NODES = {',
-    '    "for":      _ast.For,',
-    '    "while":    _ast.While,',
-    '    "with":     _ast.With,',
-    '    "lambda":   _ast.Lambda,',
-    '    "class":    _ast.ClassDef,',
-    '    "global":   _ast.Global,',
-    '    "nonlocal": _ast.Nonlocal,',
-    '    "try":      _ast.Try,',
-    '    "raise":    _ast.Raise,',
-    '    "del":      _ast.Delete,',
-    '    "assert":   _ast.Assert,',
-    '    "yield":    _ast.Yield,',
+    '    "for": _ast.For, "while": _ast.While, "with": _ast.With, "lambda": _ast.Lambda,',
+    '    "class": _ast.ClassDef, "global": _ast.Global, "nonlocal": _ast.Nonlocal, "try": _ast.Try,',
+    '    "raise": _ast.Raise, "del": _ast.Delete, "assert": _ast.Assert, "yield": _ast.Yield,',
     '}',
     '',
-    '_violations = []',
-    '_seen = set()',
-    '',
-    'def _add(msg):',
-    '    if msg not in _seen:',
-    '        _seen.add(msg)',
-    '        _violations.append(msg)',
-    '',
-    'try:',
-    '    _tree = _ast.parse(_exercise_student_code)',
-    '    for _node in _ast.walk(_tree):',
-    '        if isinstance(_node, _ast.Import):',
-    '            for _a in _node.names:',
-    '                _top = _a.name.split(".")[0]',
-    '                if _top in _fi:',
-    '                    _add(_msg_forbidden_import.format(_top))',
-    '        elif isinstance(_node, _ast.ImportFrom):',
-    '            if _node.module:',
-    '                _top = _node.module.split(".")[0]',
-    '                if _top in _fi:',
-    '                    _add(_msg_forbidden_import.format(_top))',
-    '        elif isinstance(_node, _ast.Call):',
-    '            if isinstance(_node.func, _ast.Name):',
-    '                if _node.func.id in _fk:',
-    '                    _add(_msg_forbidden_function.format(_node.func.id))',
-    '            elif isinstance(_node.func, _ast.Attribute):',
-    '                if _node.func.attr in _fk:',
-    '                    _add(_msg_forbidden_method.format(_node.func.attr))',
-    '        else:',
-    '            for _kw, _nt in _KW_NODES.items():',
-    '                if _kw in _fk and isinstance(_node, _nt):',
-    '                    _add(_msg_forbidden_keyword.format(_kw))',
-    'except SyntaxError:',
-    '    pass',
-    '',
-    '_json.dumps(_violations)',
-  ].join('\n');
-
-  // ---------------------------------------------------------------------------
-  // Python: main runner
-  // ---------------------------------------------------------------------------
-  var RUNNER_PY = [
-    'import ast, json, io, sys, traceback',
-    '',
-    '_ns = {}',
-    '_results = {"student_error": None, "stdout": "", "tests": []}',
-    '',
-    '_buf = io.StringIO()',
-    '_old_stdout = sys.stdout',
-    'sys.stdout = _buf',
-    'try:',
-    '    exec(compile(_exercise_student_code, "<student>", "exec"), _ns)',
-    '    _results["stdout"] = _buf.getvalue()',
-    'except Exception:',
-    '    _results["student_error"] = traceback.format_exc()',
-    '    _results["stdout"] = _buf.getvalue()',
-    'finally:',
-    '    sys.stdout = _old_stdout',
-    '',
-    'if _results["student_error"] is None:',
+    'def violations(code, forbidden_imports, forbidden_keywords, messages):',
+    '    found = []',
+    '    def add(message):',
+    '        if message not in found:',
+    '            found.append(message)',
     '    try:',
-    '        _tree = ast.parse(_exercise_test_code)',
-    '        for _stmt in _tree.body:',
-    '            _single = compile(',
-    '                ast.Module(body=[_stmt], type_ignores=[]),',
-    '                "<test>", "exec"',
-    '            )',
+    '        tree = _ast.parse(code)',
+    '    except SyntaxError:',
+    '        return found',
+    '    for node in _ast.walk(tree):',
+    '        if isinstance(node, _ast.Import):',
+    '            for alias in node.names:',
+    '                top = alias.name.split(".")[0]',
+    '                if top in forbidden_imports:',
+    '                    add(messages["forbidden_import"].format(top))',
+    '        elif isinstance(node, _ast.ImportFrom):',
+    '            if node.module:',
+    '                top = node.module.split(".")[0]',
+    '                if top in forbidden_imports:',
+    '                    add(messages["forbidden_import"].format(top))',
+    '        elif isinstance(node, _ast.Call):',
+    '            if isinstance(node.func, _ast.Name) and node.func.id in forbidden_keywords:',
+    '                add(messages["forbidden_function"].format(node.func.id))',
+    '            elif isinstance(node.func, _ast.Attribute) and node.func.attr in forbidden_keywords:',
+    '                add(messages["forbidden_method"].format(node.func.attr))',
+    '        else:',
+    '            for keyword, node_type in _KW_NODES.items():',
+    '                if keyword in forbidden_keywords and isinstance(node, node_type):',
+    '                    add(messages["forbidden_keyword"].format(keyword))',
+    '    return found',
+    '',
+    'def run(code, tests, messages):',
+    '    namespace = {"__name__": "__main__"}',
+    '    results = {"student_error": None, "stdout": "", "tests": []}',
+    '    state = _ctm_guard.snapshot() if _ctm_guard else None',
+    '    buffer = _io.StringIO()',
+    '    stdout = _sys.stdout',
+    '    try:',
+    '        _sys.stdout = buffer',
+    '        try:',
+    '            exec(compile(code, "<student>", "exec"), namespace)',
+    '        except (Exception, SystemExit):',
+    '            results["student_error"] = _traceback.format_exc()',
+    '        results["stdout"] = buffer.getvalue()',
+    '        if results["student_error"] is None:',
     '            try:',
-    '                exec(_single, _ns)',
-    '                _results["tests"].append({"passed": True})',
-    '            except AssertionError as e:',
-    '                _results["tests"].append({',
-    '                    "passed": False,',
-    '                    "message": str(e) if str(e) else _msg_assertion_failed',
-    '                })',
-    '            except Exception as e:',
-    '                _results["tests"].append({"passed": False, "message": _msg_test_error.format(e)})',
-    '    except SyntaxError as e:',
-    '        _results["student_error"] = _msg_syntax_error.format(e)',
+    '                tree = _ast.parse(tests)',
+    '            except SyntaxError as error:',
+    '                results["student_error"] = messages["syntax_error"].format(error)',
+    '                tree = None',
+    '            for statement in (tree.body if tree else []):',
+    '                single = compile(_ast.Module(body=[statement], type_ignores=[]), "<test>", "exec")',
+    '                try:',
+    '                    exec(single, namespace)',
+    '                    results["tests"].append({"passed": True})',
+    '                except AssertionError as error:',
+    '                    results["tests"].append({"passed": False, "message": str(error) if str(error) else messages["assertion_failed"]})',
+    '                except (Exception, SystemExit) as error:',
+    '                    results["tests"].append({"passed": False, "message": messages["test_error"].format(error)})',
+    '    finally:',
+    '        _sys.stdout = stdout',
+    '        if state is not None:',
+    '            _ctm_guard.restore(state)',
+    '    return results',
     '',
-    'json.dumps(_results)',
+    'def encode(payload, key):',
+    '    key = key.encode("utf-8")',
+    '    raw = _json.dumps(payload, ensure_ascii=False).encode("utf-8")',
+    '    return _b64.b64encode(bytes(b ^ key[i % len(key)] for i, b in enumerate(raw))).decode("ascii")',
+    '',
+    'def call(caller):',
+    '    # The request arrives as one JSON string in the shared namespace; take it out.',
+    '    request = _json.loads(caller.pop("_ctm_py_request"))',
+    '    function = {"violations": violations, "run": run, "encode": encode}[request["function"]]',
+    '    return _json.dumps(function(*request["args"]))',
   ].join('\n');
+  var CALL_PY = '__import__("' + PY_MODULE + '").call(globals())';
 
-  // ---------------------------------------------------------------------------
-  // Python: submission encoder
-  // ---------------------------------------------------------------------------
-  // Encoding: JSON → UTF-8 bytes → XOR with cycling key → Base64.
-  var ENCODER_PY = [
-    'import json as _json, base64 as _b64',
-    '',
-    '_key  = _submission_key.encode("utf-8")',
-    '_raw  = _json.dumps(_submission_payload, ensure_ascii=False).encode("utf-8")',
-    '_xord = bytes(b ^ _key[i % len(_key)] for i, b in enumerate(_raw))',
-    '_b64.b64encode(_xord).decode("ascii")',
-  ].join('\n');
+  // Calls a function of the private module on the current runtime, installing
+  // it first (again after a restart, or after other code on the page removed it).
+  async function pythonCall(py, name, args) {
+    var runtime = globalThis.MathExerciseRuntime;
+    for (var attempt = 0; ; attempt++) {
+      await runtime.ensureGuard(py);
+      await runtime.installModule(py, PY_MODULE, MODULE_PY);
+      await py.globals.set('_ctm_py_request', JSON.stringify({ function: name, args: args }));
+      try {
+        return JSON.parse(await py.runPythonAsync(CALL_PY));
+      } catch (error) {
+        if (attempt || !/No module named '_ctm_|has no attribute 'call'/.test(String(error))) throw error;
+        runtime.forgetModules(py);
+      }
+    }
+  }
+  function messages() {
+    return {
+      forbidden_import: L.msgForbiddenImport, forbidden_function: L.msgForbiddenFunction,
+      forbidden_method: L.msgForbiddenMethod, forbidden_keyword: L.msgForbiddenKeyword,
+      assertion_failed: L.msgAssertionFailed, test_error: L.msgTestError, syntax_error: L.msgSyntaxError,
+    };
+  }
 
   // ---------------------------------------------------------------------------
   // Result rendering
@@ -493,6 +490,24 @@
       clearFeedback();
 
       resultArea.innerHTML = '<div class="py-exercise-running">' + L.running + '</div>';
+      // A runtime in a worker (pyodide-interaktiv) can be stopped; Python on
+      // the page itself cannot, the page then only reloads.
+      var stopped = false;
+      var slowTimer = setTimeout(function () {
+        if (!globalThis.MathExerciseRuntime.canStop()) return;
+        var note = resultArea.querySelector('.py-exercise-running');
+        if (!note) return;
+        note.textContent = L.slowCheck + ' ';
+        var stopBtn = document.createElement('button');
+        stopBtn.type = 'button';
+        stopBtn.className = 'btn btn-sm btn-outline-danger py-exercise-stop';
+        stopBtn.textContent = L.stop;
+        stopBtn.addEventListener('click', function () {
+          stopped = true;
+          globalThis.MathExerciseRuntime.stop('Stopped by the learner');
+        });
+        note.appendChild(stopBtn);
+      }, (window.__pyExerciseSlowCheckMs || 10000));
       checkBtn.disabled = true;
       resetBtn.disabled = true;
 
@@ -501,19 +516,12 @@
       try {
         var outcome = await pythonTransaction(async function () {
           var py = await ensurePyodide();
-          await setMessages(py);
-          await Promise.all([
-            py.globals.set('_exercise_student_code',  studentCode),
-            py.globals.set('_exercise_test_code',     testsCode),
-            py.globals.set('_exercise_forbidden_imports',  py.toPy(forbiddenImports)),
-            py.globals.set('_exercise_forbidden_keywords', py.toPy(forbiddenKeywords)),
-          ]);
           if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
-            var violations = JSON.parse(await py.runPythonAsync(CHECKER_PY));
+            var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
             if (violations.length > 0) return { violations: violations };
           }
           await py.loadPackagesFromImports(studentCode);
-          return { data: JSON.parse(await py.runPythonAsync(RUNNER_PY)) };
+          return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
         });
         if (outcome.violations) {
           renderViolations(resultArea, outcome.violations);
@@ -530,13 +538,16 @@
         }};
 
       } catch (err) {
-        resultArea.innerHTML = runtimeUnavailable(err)
+        resultArea.innerHTML = stopped
+          ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
+          : runtimeUnavailable(err)
           ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
           : '<div class="py-exercise-error">' +
             '<strong>' + L.unexpectedError + '</strong>' +
             '<pre>' + escapeHtml(String(err)) + '</pre>' +
             '</div>';
       } finally {
+        clearTimeout(slowTimer);
         running = false;
         checkBtn.disabled = false;
         resetBtn.disabled = false;
@@ -684,11 +695,7 @@
     try {
       var encoded = await pythonTransaction(async function () {
         var py = await ensurePyodide();
-        await Promise.all([
-          py.globals.set('_submission_payload', py.toPy(payload)),
-          py.globals.set('_submission_key',     submissionConfig.submissionKey || 'py-exercise'),
-        ]);
-        return py.runPythonAsync(ENCODER_PY);
+        return pythonCall(py, 'encode', [payload, submissionConfig.submissionKey || 'py-exercise']);
       });
 
       if (outArea)  outArea.value = encoded;

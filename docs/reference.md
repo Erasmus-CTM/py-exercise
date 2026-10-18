@@ -259,6 +259,25 @@ assert fib(10) == 55, "fib(10) should return 55"
 | Pyodide 0.27.2 (CDN) | Loaded automatically; one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
 | Monaco Editor 0.46.0 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
 
+### What learner code can change
+
+Each **Check** runs the learner's program in a fresh namespace, so nothing
+from an earlier check or from interactive Pyodide cells leaks in, and the
+checker's own code lives in a private module (`_ctm_py_exercise`), not in the
+namespace the interactive cells share. Interpreter state the program changes
+(`builtins`, `sys.stdout`/`stdin`/`stderr`, the recursion limit, `sys.path`,
+the working directory, the CTM modules in `sys.modules`) is restored after
+the check, so one exercise cannot break another or a mathematics exercise on
+the page. `sys.exit()` in learner code or tests is reported, not raised.
+
+Grading happens in the learner's browser: the tests are part of the page and a
+determined learner can read them or fake a result. Use it for practice, not
+for high-stakes assessment. A program that never ends (an endless loop) cannot
+be interrupted when Python runs on the page itself; the page has to be
+reloaded. When pyodide-interaktiv is on the page, Python runs in a worker: a
+check that runs longer than 10 s offers **Stop**, which restarts Python for the
+whole page.
+
 `_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
 of math-exercise's file of the same name (the CTM Assessment build checks
 this); change it there first.
