@@ -4,18 +4,26 @@
 
 ## Installation
 
-For optional AI feedback, install the shared extension once in the same Quarto
-project:
-
-```sh
-quarto add Erasmus-CTM/ai-feedback
-```
-
-Then install this extension:
+Most courses install the [CTM Assessment](https://github.com/Erasmus-CTM/ctm-assessment)
+package, which contains py-exercise with tested versions of the other
+components. To use py-exercise on its own:
 
 ```bash
 quarto add Erasmus-CTM/py-exercise
 ```
+
+```yaml
+filters: [py-exercise]
+```
+
+Requirements: Quarto 1.8.27 (the tested version). Students' browsers download
+Pyodide 0.27.2 and the Monaco editor from jsDelivr; editors appear when Monaco
+is ready and the first **Check** waits for Python.
+
+| Optional feature | Install | If missing |
+|---|---|---|
+| Feedback (`py-exercise: feedback: true`) | `quarto add Erasmus-CTM/ai-feedback` | Rendering stops with a message naming this command. Without `feedback: true` it is not needed. |
+| Shared runtime with interactive Pyodide cells | [pyodide-interaktiv](https://github.com/Erasmus-CTM/pyodide-interaktiv) | py-exercise loads its own Pyodide. With pyodide-interaktiv on the page it reuses that runtime. |
 
 ---
 
