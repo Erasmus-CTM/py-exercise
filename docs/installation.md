@@ -29,6 +29,11 @@ Invalid exercise source stops rendering with a message, for example an
 exercise without `#| task:` while feedback is on. Before 0.3.0 these messages
 were printed but the render continued and published a broken exercise.
 
+Optional extensions are loaded only when used: ai-feedback when `feedback: true`
+is set or the page has `::: {.ai-feedback}` activities. A page that uses an
+optional extension (`.ai-feedback` activities, `.jsxgraph` boards) that is not
+installed stops rendering with the install command.
+
 ---
 
 

@@ -285,8 +285,8 @@ local function CodeBlock(el)
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
     task              = opts["task"],
-    policySelection   = feedback and feedback.selection(el, opts) or nil,
-    feedbackContext   = feedback and feedback.context(el, opts) or nil,
+    policySelection   = feedbackEnabled and feedback and feedback.selection(el, opts) or nil,
+    feedbackContext   = feedbackEnabled and feedback and feedback.context(el, opts) or nil,
     feedbackLanguage  = opts["feedback-language"] or lang,
     learnerLevel      = opts["learner-level"] or "",
   }
@@ -308,18 +308,30 @@ local function CodeBlock(el)
   return pandoc.RawBlock("html", html)
 end
 
+-- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
+local dependencies = nil
+local function deps()
+  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
+  return dependencies
+end
+
 return {
   { Meta = Meta },
   { Callout = function(c)
       if feedbackEnabled and quarto.doc.is_format("html") then
-        feedback = feedback or dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+        feedback = feedback or deps().feedback()
         return feedback.markCallout(c)
       end
       return c
     end },
   { Pandoc = function(doc)
-      if feedbackEnabled and quarto.doc.is_format("html") then
-        feedback = dofile(quarto.utils.resolve_path("feedback-loader.lua"))()
+      if not quarto.doc.is_format("html") then return doc end
+      -- A page that uses a missing optional extension stops here; ai-feedback
+      -- is loaded only when exercise feedback is on or the page has
+      -- `.ai-feedback` activities.
+      deps().requireUsed(doc, "py-exercise")
+      if feedbackEnabled or deps().uses(doc)["ai-feedback"] then
+        feedback = feedback or deps().feedback()
         return feedback.prepare(doc)
       end
       return doc

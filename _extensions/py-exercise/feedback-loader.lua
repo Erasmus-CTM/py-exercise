@@ -1,4 +1,23 @@
--- Locate the project installation; no feedback implementation is bundled here.
+-- Locates the optional CTM dependencies (ai-feedback, JSXGraph) without loading
+-- them, stops the render when a page uses one that is not installed, and loads
+-- the shared ai-feedback module. No feedback implementation is bundled here.
+-- Shared file: byte-identical in math-exercise, py-exercise and
+-- pyodide-interaktiv (the CTM Assessment build checks this).
+local M = {}
+
+local INSTALL = {
+  ["ai-feedback"] = "quarto add Erasmus-CTM/ai-feedback",
+  jsxgraph = "quarto add jsxgraph/jsxgraph-quarto",
+}
+-- The file that marks an installed extension, relative to its folder.
+local ENTRY = {["ai-feedback"] = "feedback-quarto.lua", jsxgraph = "_extension.yml"}
+
+local function exists(path)
+  local file = path and io.open(path, "r")
+  if file then file:close(); return true end
+  return false
+end
+
 local function version(path)
   local file = io.open(pandoc.path.join({pandoc.path.directory(path), "_extension.yml"}), "r")
   local found = file and file:read("*a"):match("\nversion:%s*['\"]?([%w%.%-]+)") or "unknown"
@@ -6,21 +25,22 @@ local function version(path)
   return found
 end
 
-local function installations()
+-- Every installation of `name` in the project: _extensions/<name>/ and
+-- _extensions/<owner>/<name>/ (nearest _extensions folder for single files).
+local function installations(name)
   local found = {}
   local base = quarto.project.directory or pandoc.path.directory(quarto.doc.input_file)
   while base and base ~= "" do
     local extensions = pandoc.path.join({base, "_extensions"})
-    local candidates = {pandoc.path.join({extensions, "ai-feedback", "feedback-quarto.lua"})}
+    local candidates = {pandoc.path.join({extensions, name, ENTRY[name]})}
     local ok, entries = pcall(pandoc.system.list_directory, extensions)
     if ok then
       for _, owner in ipairs(entries) do
-        table.insert(candidates, pandoc.path.join({extensions, owner, "ai-feedback", "feedback-quarto.lua"}))
+        table.insert(candidates, pandoc.path.join({extensions, owner, name, ENTRY[name]}))
       end
     end
     for _, path in ipairs(candidates) do
-      local file = io.open(path, "r")
-      if file then file:close(); table.insert(found, path) end
+      if exists(path) then table.insert(found, path) end
     end
     if #found > 0 or quarto.project.directory then break end
     local parent = pandoc.path.directory(base)
@@ -30,17 +50,48 @@ local function installations()
   return found
 end
 
-local function sharedFeedback()
-  -- An ai-feedback installed next to this extension (the CTM Assessment
-  -- umbrella, or one owner folder) belongs to the same set and wins, so the
-  -- umbrella and separately added copies coexist, also in other versions.
+-- The installation next to this extension (the CTM Assessment package, or one
+-- owner folder), which belongs to the same set.
+local function sibling(name)
   local here = debug.getinfo(1, "S").source:sub(2):match("^(.*)[/\\][^/\\]+[/\\][^/\\]+$")
-  local sibling = here and pandoc.path.join({here, "ai-feedback", "feedback-quarto.lua"})
-  local file = sibling and io.open(sibling, "r")
-  if file then file:close() else sibling = nil end
-  local found = sibling and {} or installations()
-  local chosen = sibling or found[1]
-  assert(chosen, "AI feedback requires the shared extension. Run: quarto add Erasmus-CTM/ai-feedback")
+  local path = here and pandoc.path.join({here, name, ENTRY[name]})
+  return exists(path) and path or nil
+end
+
+-- True when `name` is installed for this project (nothing is loaded).
+function M.installed(name)
+  return sibling(name) ~= nil or #installations(name) > 0
+end
+
+-- Which optional dependencies the page's source uses: `.ai-feedback` blocks
+-- and `.jsxgraph` code blocks (other references are checked by the consumer).
+function M.uses(doc)
+  local used = {}
+  doc.blocks:walk({
+    Div = function(div) if div.classes:includes("ai-feedback") then used["ai-feedback"] = true end end,
+    CodeBlock = function(block) if block.classes:includes("jsxgraph") then used.jsxgraph = true end end,
+  })
+  return used
+end
+
+-- Stops the render when the page uses a dependency that is not installed:
+-- without it, the blocks would be published as plain text or code.
+function M.requireUsed(doc, consumer)
+  for name in pairs(M.uses(doc)) do
+    if not M.installed(name) then
+      local what = name == "jsxgraph" and "JSXGraph boards (`.jsxgraph` blocks)" or "AI feedback activities (`.ai-feedback` blocks)"
+      assert(false, consumer .. ": this page uses " .. what .. ", but the " .. name
+        .. " extension is not installed. Run: " .. INSTALL[name])
+    end
+  end
+end
+
+-- Loads the shared ai-feedback module.
+function M.feedback()
+  local near = sibling("ai-feedback")
+  local found = near and {} or installations("ai-feedback")
+  local chosen = near or found[1]
+  assert(chosen, "AI feedback requires the shared extension. Run: " .. INSTALL["ai-feedback"])
   for _, path in ipairs(found) do
     if pandoc.path.normalize(path) ~= pandoc.path.normalize(chosen) and version(path) ~= version(chosen) then
       assert(false, "Multiple ai-feedback installations with different versions: " .. chosen .. " (" .. version(chosen)
@@ -58,8 +109,11 @@ local function sharedFeedback()
   end
   _G.__ctmAiFeedbackInstallation = loaded or {path = chosen, version = version(chosen)}
   local shared = dofile(chosen)
+  -- Feature check instead of an exact version: any release with scoped policies.
   assert(shared.selection, "Scoped feedback policies require ai-feedback 0.6.0 or later (found " .. chosen
-    .. "). Run: quarto add Erasmus-CTM/ai-feedback")
+    .. "). Run: " .. INSTALL["ai-feedback"])
   return shared
 end
-return sharedFeedback
+
+-- `dofile("feedback-loader.lua")()` keeps loading ai-feedback, as before.
+return setmetatable(M, {__call = function() return M.feedback() end})
