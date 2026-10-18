@@ -286,7 +286,8 @@ for high-stakes assessment. A program that never ends (an endless loop) cannot
 be interrupted when Python runs on the page itself; the page has to be
 reloaded. When pyodide-interaktiv is on the page, Python runs in a worker: a
 check that runs longer than 20 s offers **Stop**, which restarts Python for the
-whole page. Loading Python and packages is not counted. Change the time with `py-exercise: {stop-after: 30}` (seconds), or
+whole page. Loading Python and packages is not counted; a load that has not
+finished after 180 s also offers Stop. Change the time with `py-exercise: {stop-after: 30}` (seconds), or
 for all CTM components of a project with `ctm-assessment: {stop-after: 30}`.
 A check interrupted by an interactive cell's Stop or restart is repeated once
 on the new runtime. As before, `if __name__ == "__main__":` blocks do not run

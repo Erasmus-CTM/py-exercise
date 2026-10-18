@@ -198,11 +198,34 @@ test('loading packages does not count towards stop-after', async () => {
   await until(() => w.document.querySelector('.py-exercise-check'));
   await tick(20);
   let offered = false;
-  new w.MutationObserver(() => { offered = offered || !!w.document.querySelector('.py-exercise-stop'); })
-    .observe(w.document.body, { childList: true, subtree: true });
+  const observer = new w.MutationObserver(() => { offered = offered || !!w.document.querySelector('.py-exercise-stop'); });
+  observer.observe(w.document.body, { childList: true, subtree: true });
   w.document.querySelector('.py-exercise-check').click();
   await until(() => /passed|✓|1\/1/i.test(result(w, 1)) && !w.document.querySelector('.py-exercise-running'));
+  observer.disconnect();
   assert.equal(offered, false);
+  dom.window.close();
+});
+
+test('a package load that never finishes still offers Stop, after the load limit', async () => {
+  const { w, dom } = page(exercises().slice(0, 1));
+  w.__pyExerciseSlowCheckMs = 30;
+  w.__qExercisePyodideTimeout = 200;   // the load limit, shortened for the test
+  const interpreter = fakeInterpreter();
+  let rejectLoad;
+  interpreter.loadPackagesFromImports = () => new Promise((_, reject) => { rejectLoad = reject; });
+  interpreter.restart = () => rejectLoad(new Error('Python was restarted.'));
+  w.qpyodideInstance = Promise.resolve(interpreter);
+  w.eval(source);
+  await until(() => w.document.querySelector('.py-exercise-check'));
+  await tick(20);
+  w.document.querySelector('.py-exercise-check').click();
+  await tick(100);
+  assert.equal(w.document.querySelector('.py-exercise-stop'), null, 'not before the load limit');
+  await until(() => w.document.querySelector('.py-exercise-stop'), 3000);
+  w.document.querySelector('.py-exercise-stop').click();
+  await until(() => /Stopped/.test(result(w, 1)));
+  assert.equal(w.document.querySelector('.py-exercise-check').disabled, false);
   dom.window.close();
 });
 

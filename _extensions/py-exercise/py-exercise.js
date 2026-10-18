@@ -507,9 +507,9 @@
         stops = runtime.stopCount();
         // The clock starts once Python and the packages are loaded: on a slow
         // network the first load alone can take longer than stop-after.
-        var startSlow = function () {
+        var startSlow = function (ms) {
           cancelSlow();
-          cancelSlow = runtime.whenSlow(window.__pyExerciseSlowCheckMs ||
+          cancelSlow = runtime.whenSlow(ms || window.__pyExerciseSlowCheckMs ||
             (Number(submissionConfig.stopAfter) > 0 ? Number(submissionConfig.stopAfter) * 1000 : 20000), function () {
             var note = resultArea.querySelector('.py-exercise-running');
             if (!note) return;
@@ -537,11 +537,13 @@
         };
         var outcome;
         try {
+          startSlow(runtime.loadTimeout);   // a load that never finishes can still be stopped
           outcome = await check();
         } catch (error) {
           // Python restarted by other means (an interactive cell's Stop or
           // restart): repeat the check once on the new runtime, as math-exercise
           // does. The runtime object tells, not the (translated) error text.
+          startSlow(runtime.loadTimeout);
           if (runtime.stopCount() !== stops || !used || (await ensurePyodide()) === used) throw error;
           outcome = await check();
         }
