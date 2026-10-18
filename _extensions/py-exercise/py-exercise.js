@@ -517,9 +517,10 @@
           stopBtn.addEventListener('click', function () { runtime.stop('Stopped by the learner'); });
           note.appendChild(stopBtn);
         });
+        var used = null;
         var check = function () {
           return pythonTransaction(async function () {
-            var py = await ensurePyodide();
+            var py = used = await ensurePyodide();
             if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
               var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
               if (violations.length > 0) return { violations: violations };
@@ -533,8 +534,9 @@
           outcome = await check();
         } catch (error) {
           // Python restarted by other means (an interactive cell's Stop or
-          // restart): repeat the check once on the new runtime, as math-exercise does.
-          if (runtime.stopCount() !== stops || !/restarted/i.test(String(error))) throw error;
+          // restart): repeat the check once on the new runtime, as math-exercise
+          // does. The runtime object tells, not the (translated) error text.
+          if (runtime.stopCount() !== stops || !used || (await ensurePyodide()) === used) throw error;
           outcome = await check();
         }
         if (outcome.violations) {

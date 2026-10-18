@@ -210,13 +210,35 @@ test('a Stop from another component is reported as stopped, and queued checks th
   dom.window.close();
 });
 
-test('a check interrupted by an interactive cell restart is repeated once', async () => {
+test('a check interrupted by an interactive cell restart is repeated once on the new runtime', async () => {
+  const { w, dom } = page(exercises().slice(0, 1));
+  const first = fakeInterpreter(), second = fakeInterpreter();
+  const run = first.runPythonAsync;
+  first.runPythonAsync = async code => {
+    if (code.includes('.call(globals())')) {
+      w.mainPyodide = undefined; w.qpyodideInstance = Promise.resolve(second);   // the cell's restart
+      throw new Error('Abgebrochen – Python wurde neu gestartet');                // translated message
+    }
+    return run(code);
+  };
+  w.qpyodideInstance = Promise.resolve(first);
+  w.eval(source);
+  await until(() => w.document.querySelector('.py-exercise-check'));
+  await tick(20);
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => /passed|error/i.test(result(w, 1)));
+  assert.match(result(w, 1), /All 1 test passed/);
+  assert.equal(second.runs, 1);
+  dom.window.close();
+});
+
+test('an error on the same runtime is not repeated', async () => {
   const { w, dom } = page(exercises().slice(0, 1));
   const interpreter = fakeInterpreter();
-  let interrupted = false;
+  let calls = 0;
   const run = interpreter.runPythonAsync;
   interpreter.runPythonAsync = async code => {
-    if (code.includes('.call(globals())') && !interrupted) { interrupted = true; throw new Error('Aborted – Python was restarted'); }
+    if (code.includes('.call(globals())')) { calls++; throw new Error('BaseException: restarted by the learner code'); }
     return run(code);
   };
   w.qpyodideInstance = Promise.resolve(interpreter);
@@ -224,7 +246,7 @@ test('a check interrupted by an interactive cell restart is repeated once', asyn
   await until(() => w.document.querySelector('.py-exercise-check'));
   await tick(20);
   w.document.querySelector('.py-exercise-check').click();
-  await until(() => /passed|error/i.test(result(w, 1)));
-  assert.match(result(w, 1), /All 1 test passed/);
+  await until(() => /Unexpected error/.test(result(w, 1)));
+  assert.equal(calls, 1);
   dom.window.close();
 });
