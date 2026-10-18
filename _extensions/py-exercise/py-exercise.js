@@ -129,7 +129,7 @@
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
   // use), we load the AMD loader from CDN and let it fetch the editor itself.
   async function ensureMonaco() {
-    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46.0/min/vs';
+    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46/min/vs';
     if (typeof require === 'undefined') {
       await loadScript(cdnBase + '/loader.js');
     }

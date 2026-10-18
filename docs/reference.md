@@ -257,7 +257,17 @@ assert fib(10) == 55, "fib(10) should return 55"
 | Dependency | Purpose |
 |---|---|
 | Pyodide 0.27.2 (CDN) | Loaded automatically; one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
-| Monaco Editor 0.46.0 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
+| Monaco Editor 0.46 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
+
+### Tests
+
+`npm ci && npm test` runs the browser-runtime tests (jsdom) and, when Quarto is
+installed, the render tests; set `AI_FEEDBACK_EXTENSION` to an installed
+ai-feedback folder for the feedback cases. `python -m unittest discover -s tests`
+challenges the published examples and checks the isolation of learner code.
+In VS Code, **Terminal → Run Task…** offers the same commands
+(`.vscode/tasks.json`): the default test task runs the tests, the default build
+task renders the example and then tests.
 
 ### What learner code can change
 

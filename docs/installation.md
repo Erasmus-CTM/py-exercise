@@ -16,9 +16,15 @@ quarto add Erasmus-CTM/py-exercise
 filters: [py-exercise]
 ```
 
-Requirements: Quarto 1.8.27 (the tested version). Students' browsers download
+Requirements: Quarto 1.8.27 or later (the earliest version tested). Students' browsers download
 Pyodide 0.27.2 and the Monaco editor from jsDelivr; editors appear when Monaco
 is ready and the first **Check** waits for Python.
+
+**Quarto 1.10:** this release sends pages with blocks such as
+`{math-exercise}`, `{py-exercise}` or `{pyodide-python}` to Jupyter (an
+upstream regression, reported). Until it is fixed, add `engine: markdown` to
+the front matter of each such page (in `_quarto.yml` it has no effect), or use
+Quarto 1.8.
 
 | Optional feature | Install | If missing |
 |---|---|---|

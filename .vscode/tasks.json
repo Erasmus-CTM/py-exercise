@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run tests",
+      "type": "shell",
+      "command": "npm test && python -m unittest discover -s tests",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "AI_FEEDBACK_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ai-feedback"
+        }
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Render examples and run tests",
+      "type": "shell",
+      "command": "quarto render example.qmd && npm test && python -m unittest discover -s tests",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "AI_FEEDBACK_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ai-feedback"
+        }
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
