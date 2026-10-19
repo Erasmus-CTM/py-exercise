@@ -23,12 +23,20 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.8.27'
-      - uses: actions/checkout@v4
+      - name: Fetch ctm-libs, the library of CTM Assessment
+        uses: actions/checkout@v4
         with:
-          repository: Erasmus-CTM/ai-feedback
-          ref: ${{ steps.review.outputs['ai-feedback'] || 'main' }}
-          path: _feedback-source
-      - run: quarto add ./_feedback-source --no-prompt
+          repository: Erasmus-CTM/ctm-libs
+          ref: ${{ steps.review.outputs['ctm-libs'] || 'main' }}
+          path: _ctm-libs-source
+      - name: Install ctm-libs (a component build without the CTM Assessment package)
+        run: |
+          quarto add ./_ctm-libs-source --no-prompt
+          test -f _extensions/ctm-libs/lua/ctm.lua || { echo "::error::ctm-libs was not installed (is the ref a ctm-libs 0.9 or later commit?)"; exit 1; }
+          echo "CTM_LIBS_EXTENSION=$GITHUB_WORKSPACE/_ctm-libs-source/_extensions/ctm-libs" >> "$GITHUB_ENV"
+          # py-exercise stops without the CTM Assessment package unless the
+          # build says it is a component development build.
+          echo "CTM_COMPONENT_DEV=1" >> "$GITHUB_ENV"
       - name: Test the published example requirements
         run: python -m unittest discover -s tests
       - name: Build the standalone pages
