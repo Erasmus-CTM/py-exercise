@@ -72,19 +72,13 @@ local feedbackWanted, feedbackOrigin, feedbackEnabled = false, nil, false
 local lang = "en"
 
 ----
--- Helper: read a file that lives next to this .lua filter
+-- This extension's version (its _extension.yml), for its HTML dependencies.
 ----
-local function readFile(filename)
-  local path = quarto.utils.resolve_path(filename)
-  local f = io.open(path, "r")
-  if not f then
-    -- assert: Quarto replaces error() with a logger that does not stop the render.
-    assert(false, "py-exercise: cannot open '" .. filename ..
-          "' – make sure it is present in the _extensions/py-exercise/ directory.")
-  end
-  local content = f:read("*a")
-  f:close()
-  return content
+local function extensionVersion()
+  local f = io.open(quarto.utils.resolve_path("_extension.yml"), "r")
+  local version = f and f:read("*a"):match("\nversion:%s*['\"]?([%w%.%-]+)")
+  if f then f:close() end
+  return version or "0"
 end
 
 ----
@@ -142,19 +136,16 @@ local function splitCode(code)
 end
 
 ----
--- Inject the extension's CSS (in <head>) and JS (after <body>) exactly once.
--- Also injects the runtime config object into before-body.
+-- Scripts and styles as cacheable HTML dependencies, once per page: ctm-libs'
+-- Python runtime (MathExerciseRuntime) and message catalogue (CTMLocales) in
+-- the head, then this extension's style, and its scripts at the end of the
+-- body: the feedback adapter (with AI feedback) before py-exercise.js. The
+-- runtime config is written inline before the body, so it exists when they run.
 ----
 local function ensureExerciseSetup()
   if hasExerciseSetup then return end
   hasExerciseSetup = true
 
-  -- CSS
-  local css = readFile("py-exercise.css")
-  quarto.doc.include_text("in-header",
-    "<style type=\"text/css\">\n" .. css .. "\n</style>")
-
-  -- Runtime config – must land before py-exercise.js runs (before-body < after-body)
   local config = {
     submission    = submissionEnabled,
     submissionKey = submissionKey,
@@ -165,14 +156,22 @@ local function ensureExerciseSetup()
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
 
-  -- The message catalogue (CTMLocales), read by py-exercise.js.
+  ctm.runtime.use()
   ctm.locale.use("py-exercise")
-
-  -- JS
-  local js = readFile("shared/pyodide-runtime.js") .. "\n"
-    .. (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
-  quarto.doc.include_text("after-body",
-    "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
+  local version = extensionVersion()
+  if feedbackEnabled then
+    quarto.doc.add_html_dependency({
+      name = "py-exercise-feedback",
+      version = version,
+      scripts = {{path = "py-exercise-feedback.js", afterBody = true}},
+    })
+  end
+  quarto.doc.add_html_dependency({
+    name = "py-exercise",
+    version = version,
+    stylesheets = {"py-exercise.css"},
+    scripts = {{path = "py-exercise.js", afterBody = true}},
+  })
 end
 
 ----

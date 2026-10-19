@@ -5,10 +5,10 @@
   // Utilities
   // ---------------------------------------------------------------------------
 
-  // The page-wide Pyodide bootstrap shared with math-exercise
-  // (shared/pyodide-runtime.js, a byte-identical copy of math-exercise's file).
-  // It reuses pyodide-interaktiv's runtime when present and asks again for
-  // every run, because that runtime can be replaced (Stop/restart).
+  // The page-wide Python runtime shared with math-exercise (ctm-libs'
+  // runtime/pyodide-runtime.js, loaded once per page as the ctm-runtime
+  // dependency). It reuses pyodide-interaktiv's runtime when present and asks
+  // again for every run, because that runtime can be replaced (Stop/restart).
   function loadScript(src) { return globalThis.MathExerciseRuntime.loadScript(src); }
   function ensurePyodide() { return globalThis.MathExerciseRuntime.ensurePyodide(); }
   function runtimeUnavailable(error) {
