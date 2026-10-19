@@ -74,7 +74,7 @@
   // pyodide-interaktiv cells use like a notebook. Every check runs the
   // learner's code in a fresh namespace; interpreter state it changes
   // (builtins, sys.stdout, recursion limit, ...) is restored afterwards
-  // (_ctm_guard, shared/pyodide-runtime.js).
+  // (_ctm_guard, ctm-libs' runtime/pyodide-runtime.js).
   // ---------------------------------------------------------------------------
   var PY_MODULE = '_ctm_py_exercise';
   var MODULE_PY = [

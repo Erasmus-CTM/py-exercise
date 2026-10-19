@@ -4,12 +4,13 @@
 
 ## Usage
 
-No additional filter needed – Pyodide and Monaco Editor are automatically
-loaded from a CDN:
+py-exercise is a part of CTM Assessment ([installation](installation.md));
+list the package's filter. No additional filter is needed – Pyodide and
+Monaco Editor are automatically loaded from a CDN:
 
 ```yaml
 filters:
-  - Erasmus-CTM/py-exercise
+  - ctm-assessment
 ```
 
 ---
@@ -240,7 +241,7 @@ is not shown, so capture it in the test if it should be checked.
 ---
 title: "Python Exercises – SoSe 2025"
 filters:
-  - Erasmus-CTM/py-exercise
+  - ctm-assessment
 py-exercise:
   submission: true
   submission-key: "sose25-final"
