@@ -9,7 +9,7 @@ filters:
   - py-exercise
 ai-feedback:
   mode: copy
-  page-policy-files: feedback/python-policies.yml
+  policy-files: feedback/python-policies.yml
 py-exercise:
   feedback: true
   lang: en

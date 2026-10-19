@@ -3,7 +3,7 @@ title: "Small Python tasks, useful next steps"
 format: html
 filters: [_filters/example-source.lua, py-exercise]
 ai-feedback:
-  page-policy-files: feedback/python-policies.yml
+  policy-files: feedback/python-policies.yml
   mode: copy
 py-exercise:
   feedback: true

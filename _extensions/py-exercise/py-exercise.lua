@@ -1,13 +1,11 @@
-local feedback = nil
--- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
-local dependencies = nil
-local function deps()
-  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
-  return dependencies
-end
+-- py-exercise is a part of CTM Assessment. Its library ctm-libs (settings,
+-- languages, the Python runtime, AI feedback, the JSXGraph check) is found by
+-- the canonical bootstrap, which stops the render with the install command
+-- when CTM Assessment is missing.
+local ctm = dofile(quarto.utils.resolve_path("ctm-bootstrap.lua"))("py-exercise")
 
--- Decided per page in the first pass: load ai-feedback for exercise feedback
--- or for `.ai-feedback` activities on the page; nothing otherwise.
+-- Decided per page in the first pass: ctm-libs' feedback preparation runs for
+-- exercise feedback or for `.ai-feedback` activities on the page; not otherwise.
 local needFeedback = false
 -- Seconds after which a running check offers Stop (stop-after).
 local stopAfter = 20
@@ -58,58 +56,38 @@ local submissionKey     = "py-exercise"
 
 -- Whether failed tests reveal their assertion message (default: true)
 local globalShowTestHints = true
-local feedbackEnabled = false
+-- AI feedback for the exercises: `py-exercise: feedback: true` asks for it
+-- (feedbackWanted, where it is set: feedbackOrigin); a build without AI
+-- feedback (P22) refuses it (feedbackEnabled).
+local feedbackWanted, feedbackOrigin, feedbackEnabled = false, nil, false
 
--- Language / locale (default: English)
+-- Interface language, resolved per page by ctm-libs (see Meta below):
+--   1. `py-exercise: lang: xx`     – explicit override
+--   2. `ctm-assessment: lang: xx`  – every component of the project
+--   3. Quarto's own `lang:`        – set per profile in a multilingual project
+--   4. "en"                        – fallback
+-- Region subtags are dropped ("de-DE" -> "de", "no" and "nn" -> "nb");
+-- unsupported languages fall back to English instead of failing the render.
+-- Every interface text is in ctm-libs' message catalogue (locales/py-exercise.js).
 local lang = "en"
 
--- Supported locales. Extend this set together with LOCALES in py-exercise.js.
-local supportedLangs = {
-  ["en"] = true,
-  ["de"] = true
-}
-
--- Noscript messages per locale
-local noscriptMessages = {
-  en = "Please enable JavaScript to load the interactive exercise.",
-  de = "Bitte JavaScript aktivieren, um die interaktive Aufgabe zu laden.",
-}
-
 ----
--- Helper: read a file that lives next to this .lua filter
+-- This extension's version (its _extension.yml), for its HTML dependencies.
 ----
-local function readFile(filename)
-  local path = quarto.utils.resolve_path(filename)
-  local f = io.open(path, "r")
-  if not f then
-    -- assert: Quarto replaces error() with a logger that does not stop the render.
-    assert(false, "py-exercise: cannot open '" .. filename ..
-          "' – make sure it is present in the _extensions/py-exercise/ directory.")
-  end
-  local content = f:read("*a")
-  f:close()
-  return content
+local function extensionVersion()
+  local f = io.open(quarto.utils.resolve_path("_extension.yml"), "r")
+  local version = f and f:read("*a"):match("\nversion:%s*['\"]?([%w%.%-]+)")
+  if f then f:close() end
+  return version or "0"
 end
 
 ----
--- Helper: convert a Pandoc MetaList or scalar Meta value to a plain Lua list of strings.
+-- Helper: JSON for an inline <script>: <, > and & as \u escapes, so that
+-- text such as "</script>" in code, tests or settings cannot end the script
+-- (as ctm-libs' feedback.lua writes its data).
 ----
-local function metaToList(value)
-  local result = {}
-  if not value then return result end
-  if type(value) == "table" and value[1] ~= nil then
-    for _, item in ipairs(value) do
-      local s = pandoc.utils.stringify(item):match("^%s*(.-)%s*$")
-      if s ~= "" then table.insert(result, s) end
-    end
-  else
-    local s = pandoc.utils.stringify(value)
-    for item in s:gmatch("[^,]+") do
-      local trimmed = item:match("^%s*(.-)%s*$")
-      if trimmed ~= "" then table.insert(result, trimmed) end
-    end
-  end
-  return result
+local function scriptJson(value)
+  return (quarto.json.encode(value):gsub("<", "\\u003c"):gsub(">", "\\u003e"):gsub("&", "\\u0026"))
 end
 
 ----
@@ -167,19 +145,16 @@ local function splitCode(code)
 end
 
 ----
--- Inject the extension's CSS (in <head>) and JS (after <body>) exactly once.
--- Also injects the runtime config object into before-body.
+-- Scripts and styles as cacheable HTML dependencies, once per page: ctm-libs'
+-- Python runtime (MathExerciseRuntime) and message catalogue (CTMLocales) in
+-- the head, then this extension's style, and its scripts at the end of the
+-- body: the feedback adapter (with AI feedback) before py-exercise.js. The
+-- runtime config is written inline before the body, so it exists when they run.
 ----
 local function ensureExerciseSetup()
   if hasExerciseSetup then return end
   hasExerciseSetup = true
 
-  -- CSS
-  local css = readFile("py-exercise.css")
-  quarto.doc.include_text("in-header",
-    "<style type=\"text/css\">\n" .. css .. "\n</style>")
-
-  -- Runtime config – must land before py-exercise.js runs (before-body < after-body)
   local config = {
     submission    = submissionEnabled,
     submissionKey = submissionKey,
@@ -188,75 +163,44 @@ local function ensureExerciseSetup()
     stopAfter     = stopAfter,
   }
   quarto.doc.include_text("before-body",
-    "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
+    "<script>window.__pyExerciseConfig = " .. scriptJson(config) .. ";</script>")
 
-  -- JS
-  local js = readFile("shared/pyodide-runtime.js") .. "\n"
-    .. (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
-  quarto.doc.include_text("after-body",
-    "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
+  ctm.runtime.use()
+  ctm.locale.use("py-exercise")
+  local version = extensionVersion()
+  if feedbackEnabled then
+    quarto.doc.add_html_dependency({
+      name = "py-exercise-feedback",
+      version = version,
+      scripts = {{path = "py-exercise-feedback.js", afterBody = true}},
+    })
+  end
+  quarto.doc.add_html_dependency({
+    name = "py-exercise",
+    version = version,
+    stylesheets = {"py-exercise.css"},
+    scripts = {{path = "py-exercise.js", afterBody = true}},
+  })
 end
 
 ----
--- Determine the UI language for this render pass.
---
--- Order of precedence:
---   1. `py-exercise: lang: xx`  – explicit override
---   2. Quarto's own `lang:`     – set per profile in a multilingual project
---   3. "en"                     – fallback
---
--- Region subtags are dropped ("de-DE" -> "de"); unsupported languages fall
--- back to English instead of failing the render.
-----
-local function resolveLang(meta)
-  local raw = nil
-
-  local cfg = meta["py-exercise"]
-  if cfg and cfg["lang"] then
-    raw = pandoc.utils.stringify(cfg["lang"])
-  elseif meta["lang"] then
-    raw = pandoc.utils.stringify(meta["lang"])
-  end
-
-  if raw == nil or raw == "" then
-    return "en"
-  end
-
-  local base = raw:lower():match("^(%a+)")
-  if base and supportedLangs[base] then
-    return base
-  end
-
-  return "en"
-end
-
-----
--- Phase 1 – Meta: read global options from document YAML front matter.
+-- Phase 1 – Meta: read the page's settings. ctm-libs combines them key by key
+-- across _quarto.yml, profiles, _metadata.yml and the front matter.
 ----
 local function Meta(meta)
-  -- Resolve the language first: it must also work for documents that only set
-  -- Quarto's `lang:` and have no `py-exercise:` block, so this happens before
-  -- the early return below.
-  lang = resolveLang(meta)
-  stopAfter = deps().stopAfter(meta, "py-exercise")
+  if not quarto.doc.is_format("html") then return meta end
+  ctm.settings.load(meta)
+  lang = ctm.locale.resolve("py-exercise")
+  -- `py-exercise: stop-after`, `ctm-assessment: stop-after`, 20 seconds.
+  stopAfter = ctm.runtime.stopAfter("py-exercise")
 
-  if not meta["py-exercise"] then return meta end
-  local cfg = meta["py-exercise"]
-
-  globalForbiddenImports  = metaToList(cfg["forbidden-imports"])
-  feedbackEnabled = pandoc.utils.stringify(cfg["feedback"] or "false") == "true"
-  globalForbiddenKeywords = metaToList(cfg["forbidden-keywords"])
-
-  if cfg["submission"] then
-    submissionEnabled = (pandoc.utils.stringify(cfg["submission"]) == "true")
-  end
-  if cfg["submission-key"] then
-    submissionKey = pandoc.utils.stringify(cfg["submission-key"])
-  end
-
-  if cfg["show-test-hints"] then
-    globalShowTestHints = not (pandoc.utils.stringify(cfg["show-test-hints"]) == "false")
-  end
+  globalForbiddenImports  = ctm.settings.list("py-exercise", "forbidden-imports")
+  globalForbiddenKeywords = ctm.settings.list("py-exercise", "forbidden-keywords")
+  -- true or false; other values (accepted loosely before) warn and use the default.
+  feedbackWanted, feedbackOrigin = ctm.settings.bool("py-exercise", "feedback", {loose = true, default = false})
+  submissionEnabled = ctm.settings.bool("py-exercise", "submission", {loose = true, default = false})
+  submissionKey = ctm.settings.string("py-exercise", "submission-key", {default = "py-exercise"})
+  globalShowTestHints = ctm.settings.bool("py-exercise", "show-test-hints", {loose = true, default = true})
   return meta
 end
 
@@ -274,7 +218,9 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
-  if feedbackEnabled and (not opts["task"] or opts["task"] == "") then
+  -- Asked for, feedback needs the task, also in a build without AI feedback
+  -- (both builds fail alike).
+  if feedbackWanted and (not opts["task"] or opts["task"] == "") then
     assert(false, "py-exercise: shared feedback requires #| task: with the learner's assignment.")
   end
 
@@ -289,6 +235,10 @@ local function CodeBlock(el)
     cellShowTestHints = not (opts["show-test-hints"] == "false")
   end
 
+  -- The policy name is checked whenever feedback is asked for; a build without
+  -- AI feedback (P22) leaves out every field that only AI feedback reads.
+  local selection = feedbackWanted and ctm.feedback.selection(el, opts) or nil
+  local ai = ctm.feedback.enabled()
   local exerciseData = {
     id                = exerciseCounter,
     starter           = starter,
@@ -298,16 +248,16 @@ local function CodeBlock(el)
     forbiddenImports  = forbiddenImports,
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
-    task              = opts["task"],
-    policySelection   = feedbackEnabled and feedback and feedback.selection(el, opts) or nil,
-    feedbackContext   = feedbackEnabled and feedback and feedback.context(el, opts) or nil,
-    feedbackLanguage  = opts["feedback-language"] or lang,
-    learnerLevel      = opts["learner-level"] or "",
+    task              = ai and opts["task"] or nil,
+    policySelection   = feedbackEnabled and selection or nil,
+    feedbackContext   = feedbackEnabled and ctm.feedback.context(el, opts) or nil,
+    feedbackLanguage  = ai and (opts["feedback-language"] or lang) or nil,
+    learnerLevel      = ai and (opts["learner-level"] or "") or nil,
   }
 
-  local dataJson = quarto.json.encode(exerciseData)
+  local dataJson = scriptJson(exerciseData)
 
-  local noscriptMsg = noscriptMessages[lang] or noscriptMessages["en"]
+  local noscriptMsg = ctm.locale.text("py-exercise", "noscript", lang)
   local html = table.concat({
     '<div class="py-exercise-cell" id="' .. divId .. '">',
     '  <noscript>',
@@ -324,25 +274,28 @@ end
 
 return {
   { Meta = Meta },
-  -- A page that uses a missing optional extension stops here; then decide
-  -- whether ai-feedback is needed, before callouts are marked for it.
+  -- A page that uses JSXGraph without the extension stops here; then decide
+  -- whether AI feedback is needed, before callouts are marked for it.
   { Pandoc = function(doc)
       if not quarto.doc.is_format("html") then return doc end
-      deps().requireUsed(doc, "py-exercise")
-      needFeedback = feedbackEnabled or deps().uses(doc)["ai-feedback"] == true
+      ctm.deps.requireUsed(doc, "py-exercise")
+      local exercises = false
+      doc.blocks:walk({CodeBlock = function(b) if b.classes:includes("{py-exercise}") then exercises = true end end})
+      -- A build without AI feedback refuses it and names it in its build message.
+      feedbackEnabled = ctm.feedback.request("py-exercise", feedbackWanted and exercises,
+        "feedback: true" .. (feedbackOrigin and (" in " .. feedbackOrigin) or ""))
+      needFeedback = feedbackWanted or ctm.deps.uses(doc)["ai-feedback"] == true
       return doc
     end },
   { Callout = function(c)
       if needFeedback and quarto.doc.is_format("html") then
-        feedback = feedback or deps().feedback()
-        return feedback.markCallout(c)
+        return ctm.feedback.markCallout(c)
       end
       return c
     end },
   { Pandoc = function(doc)
       if needFeedback and quarto.doc.is_format("html") then
-        feedback = feedback or deps().feedback()
-        return feedback.prepare(doc)
+        return ctm.feedback.prepare(doc)
       end
       return doc
     end },

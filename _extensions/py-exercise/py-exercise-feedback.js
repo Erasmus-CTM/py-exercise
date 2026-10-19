@@ -3,15 +3,6 @@
   'use strict';
   function attach(options) {
     const F = root.AIFeedback;
-    if (!F?.contextMaterials) {
-      const disabled = document.createElement('button');
-      disabled.type = 'button'; disabled.className = 'btn btn-light py-exercise-feedback';
-      disabled.textContent = 'Feedback'; disabled.disabled = true; options.buttonBar.append(disabled);
-      const notice = document.createElement('div'); notice.className = 'py-exercise-feedback-output';
-      notice.textContent = 'Python feedback requires ai-feedback 0.5.0 or later. Update the extension and render again. Check remains available.';
-      options.container.append(notice);
-      return {invalidate() {}, reset() {}, dispose() {notice.remove(); disabled.remove();}};
-    }
     const locale = F.locales[options.uiLanguage] || F.locales.en;
     const button = document.createElement('button');
     button.type = 'button';

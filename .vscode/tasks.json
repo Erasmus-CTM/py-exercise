@@ -8,7 +8,8 @@
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "AI_FEEDBACK_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ai-feedback"
+          "CTM_LIBS_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ctm-libs",
+          "CTM_COMPONENT_DEV": "1"
         }
       },
       "problemMatcher": [],
@@ -24,7 +25,8 @@
       "options": {
         "cwd": "${workspaceFolder}",
         "env": {
-          "AI_FEEDBACK_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ai-feedback"
+          "CTM_LIBS_EXTENSION": "${workspaceFolder}/_extensions/Erasmus-CTM/ctm-libs",
+          "CTM_COMPONENT_DEV": "1"
         }
       },
       "problemMatcher": [],

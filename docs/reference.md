@@ -4,12 +4,13 @@
 
 ## Usage
 
-No additional filter needed – Pyodide and Monaco Editor are automatically
-loaded from a CDN:
+py-exercise is a part of CTM Assessment ([installation](installation.md));
+list the package's filter. No additional filter is needed – Pyodide and
+Monaco Editor are automatically loaded from a CDN:
 
 ```yaml
 filters:
-  - Erasmus-CTM/py-exercise
+  - ctm-assessment
 ```
 
 ---
@@ -63,25 +64,38 @@ py-exercise:
 
 | Option | Default | Description |
 |--------|----------|--------------|
-| `forbidden-imports` | `[]` | Forbidden imports for all exercises |
-| `forbidden-keywords` | `[]` | Forbidden keywords for all exercises |
+| `forbidden-imports` | `[]` | Forbidden imports for all exercises (a list, or comma-separated) |
+| `forbidden-keywords` | `[]` | Forbidden keywords for all exercises (a list, or comma-separated) |
 | `show-test-hints` | `true` | Show the assertion message on failed tests |
 | `submission` | `false` | Enable submission mode |
 | `submission-key` | `"py-exercise"` | XOR key used to encode results |
-| `lang` | `"en"` | UI language (`"de"` or `"en"`) |
+| `lang` | `ctm-assessment: lang`, then `lang`, then `"en"` | UI language (`"en"`, `"de"` or `"nb"`) |
+| `feedback` | `false` | AI feedback for the exercises ([below](#shared-feedback)) |
+| `stop-after` | `ctm-assessment: stop-after`, then `20` | Seconds before a running check offers **Stop** |
+
+The options combine key by key across `_quarto.yml`, profiles,
+`_quarto.yml.local`, `_metadata.yml` files and the page's front matter: a page
+that sets one option keeps the project's other options.
+`ctm-assessment: {lang: nb, stop-after: 30}` sets the language and Stop time
+of every CTM Assessment component at once; `py-exercise:` overrides them for
+this component. `show-test-hints`, `submission` and `feedback` take `true` or
+`false`; another value warns and uses the default (it becomes an error in CTM
+Assessment 1.0).
 
 ---
 
 ## UI Language
 
-Currently supported: **German (`de`)** and **English (`en`)**.
-**The default is English** – without any setting, the UI appears in English.
+Currently supported: **English (`en`)**, **German (`de`)** and **Norwegian
+Bokmål (`nb`)**. **The default is English** – without any setting, the UI
+appears in English.
 
 The extension reads the language in this order:
 
 1. `py-exercise: lang:` – explicit override
-2. **Quarto's own `lang:`** – the normal case
-3. `en` – fallback
+2. `ctm-assessment: lang:` – the language of every CTM Assessment component
+3. **Quarto's own `lang:`** – the normal case
+4. `en` – fallback
 
 Quarto's standard key is therefore enough; no extra option is needed:
 
@@ -90,12 +104,14 @@ Quarto's standard key is therefore enough; no extra option is needed:
 title: "Python Exercises"
 lang: de
 filters:
-  - Erasmus-CTM/py-exercise
+  - ctm-assessment
 ---
 ```
 
-Regional variants are shortened (`de-DE` → `de`). An unsupported language
-(e.g. `fr`) silently falls back to English and does **not** break rendering.
+Regional variants are shortened (`de-DE` → `de`); Norwegian `no` and Nynorsk
+`nn` get the Bokmål interface (before py-exercise 0.4.0, English). An
+unsupported language (e.g. `fr`) silently falls back to English and does
+**not** break rendering.
 
 Buttons, test results, the submission and download sections, and the rule-check
 messages (forbidden imports, etc.) are all translated – the latter are passed
@@ -127,10 +143,10 @@ therefore automatically switches the extension's language as well.
 
 ### Adding Another Language
 
-1. In `_extensions/py-exercise/py-exercise.js`, add a `LOCALES` block modeled
-   on `de` (copy all keys).
-2. In `py-exercise.lua`, add the language code to `supportedLangs` and extend
-   the `noscriptMessages` table.
+The interface texts are in CTM Assessment's message catalogue, in ctm-libs
+(`locales/py-exercise.js`, shared with the other components' catalogues). A
+new language is added there with all its texts; see ctm-libs'
+[development guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/development.md#messages).
 
 ---
 
@@ -225,7 +241,7 @@ is not shown, so capture it in the test if it should be checked.
 ---
 title: "Python Exercises – SoSe 2025"
 filters:
-  - Erasmus-CTM/py-exercise
+  - ctm-assessment
 py-exercise:
   submission: true
   submission-key: "sose25-final"
@@ -256,15 +272,18 @@ assert fib(10) == 55, "fib(10) should return 55"
 
 | Dependency | Purpose |
 |---|---|
-| Pyodide 0.27.2 (CDN) | Loaded automatically; one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
+| Pyodide 0.28.3 (CDN) | Loaded automatically through CTM Assessment's shared runtime (ctm-libs); one runtime per page, shared with math-exercise and pyodide-interaktiv. A load that does not finish within 180 s shows a message, and the next **Check** tries again. |
 | Monaco Editor 0.46 (CDN) | Loaded automatically; if it takes longer than 60 s a message appears, replaced by the editors if they still arrive. |
 
 ### Tests
 
+The tests need ctm-libs, the library of CTM Assessment, installed for a
+[development build](installation.md#development-of-py-exercise).
 `npm ci && npm test` runs the browser-runtime tests (jsdom) and, when Quarto is
-installed, the render tests; set `AI_FEEDBACK_EXTENSION` to an installed
-ai-feedback folder for the feedback cases. `python -m unittest discover -s tests`
+installed, the render tests; `python -m unittest discover -s tests`
 challenges the published examples and checks the isolation of learner code.
+Both read ctm-libs' files from `CTM_LIBS_EXTENSION` (without it, from
+`_extensions/ctm-libs` or `_extensions/<owner>/ctm-libs`).
 In VS Code, **Terminal → Run Task…** offers the same commands
 (`.vscode/tasks.json`): the default test task runs the tests, the default build
 task renders the example and then tests.
@@ -294,15 +313,15 @@ A check interrupted by an interactive cell's Stop or restart is repeated once
 on the new runtime. As before, `if __name__ == "__main__":` blocks do not run
 during a check.
 
-`_extensions/py-exercise/shared/pyodide-runtime.js` is a byte-identical copy
-of math-exercise's file of the same name (the CTM Assessment build checks
-this); change it there first.
+The page's Python runtime (Stop, the load limit, the shared interpreter
+guard) is ctm-libs' `runtime/pyodide-runtime.js`, loaded once per page for
+all components; change it there.
 
 ---
 
 ## Shared feedback integration
 
-Install the shared `ai-feedback` extension alongside `py-exercise`, then enable:
+AI feedback is part of CTM Assessment; enable it for the exercises with:
 
 ```yaml
 py-exercise:
@@ -316,39 +335,48 @@ uses current code without executing it. Checker summaries and learner output
 are included only after checking that exact code; edits and Reset invalidate
 them. Hidden test source, assertion messages, tracebacks and submission details
 are excluded. Without `feedback: true`, existing checker behavior is unchanged.
+A site built without AI feedback (`ai-feedback: enabled: false`, for example
+in a profile, or `CTM_FEEDBACK=off quarto render`) has no Feedback button and
+nothing that only feedback reads (task, learner level); a page that sets
+`feedback: true` is named in one build message, and `#| task:` is still
+required, so both builds fail alike.
 
 Cross-integration examples and acceptance tests live in
 [Erasmus-CTM/ctm-assessment](https://github.com/Erasmus-CTM/ctm-assessment).
 
 ## Configurable shared teaching policies
 
-AI Feedback 0.8 uses explicit `page-policy`/`project-policy` selection,
-`base-prompt`, `step-prompt` and named `extends` inheritance. Loading policy files
-only registers definitions. See the [shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
+AI feedback loads named definitions from `ai-feedback: policy-files:` (the
+files of the project, profiles, `_metadata.yml` and the page add up) and
+selects one with `ai-feedback: policy:` (the nearest setting wins); policies
+use `base-prompt`, `step-prompt` and named `extends` inheritance. Loading
+policy files only registers definitions. The earlier keys `project-policy`,
+`page-policy` and `page-policy-files` keep working in CTM Assessment 0.9 with a
+build warning. See the [shared policy guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/feedback-policies.md).
 
 ## Shared dependency and learning context
 
-Install ai-feedback once in the project; `py-exercise: feedback: true` loads it
-automatically. Shared feedback requires ai-feedback 0.8.0 or later.
-No shared runtime is copied into this plugin. Omitted `context` collects preceding
-section prose; `context: none` opts out; `context: id1,id2` selects tagged
-`.ai-context` blocks reusable by text, math and Pyodide activities.
-`feedback-context` is an alias. See the
-[shared guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/README.md)
+py-exercise loads AI feedback from ctm-libs, CTM Assessment's library, when
+`py-exercise: feedback: true` is set; nothing is copied into this extension.
+Omitted `context` collects preceding section prose; `context: none` opts out;
+`context: id1,id2` selects tagged `.ai-context` blocks reusable by text, math
+and Pyodide activities, followed by the prose of the exercise's own section
+without those blocks. `feedback-context` is an alias. See the
+[shared guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/reference.md)
 for policies, limits, evidence boundaries and settings.
 
 ### Standalone example
 
-`example.qmd` demonstrates this package with shared feedback. Install `Erasmus-CTM/ai-feedback`, then run `quarto render example.qmd`. No other integration extension is required. The example builds automatically on pushes and pull requests; download the `standalone-example` Actions artifact. Feedback defaults to copy mode, which needs no API key.
+`example.qmd` demonstrates this package with shared feedback. In a [development setup](installation.md#development-of-py-exercise) run `CTM_COMPONENT_DEV=1 quarto render example.qmd`; no other integration extension is required. The example builds automatically on pushes and pull requests; download the `standalone-example` Actions artifact. Feedback defaults to copy mode, which needs no API key.
 
 ### Page and exercise feedback policies
 
 Put teaching policy definitions in YAML files and activate them explicitly with
-`project-policy`, `page-policy` or a cell's `#| feedback-policy: name`. A policy
-file registers definitions; `page-policy-files` alone does not change page
-behavior. The same named policy can be reused across integrations.
+`policy` or a cell's `#| feedback-policy: name`. A policy file registers
+definitions; `policy-files` alone does not change page behavior. The same
+named policy can be reused across integrations.
 
 YAML `ai-feedback.exercises.<integration>.<label>` targets one authored label;
 an explicit named selection takes precedence over that entry. Omitted settings
 inherit; `steps` replaces the entire list. See the
-[shared policy guide](https://github.com/Erasmus-CTM/ai-feedback/blob/main/docs/feedback-policies.md).
+[shared policy guide](https://github.com/Erasmus-CTM/ctm-libs/blob/main/docs/feedback-policies.md).

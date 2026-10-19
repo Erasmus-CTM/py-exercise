@@ -3,8 +3,12 @@
 /*_files/
 /_site/
 /.quarto/
+# `quarto add` of ctm-libs also installs its ai-feedback alias.
+/_extensions/ctm-libs/
 /_extensions/ai-feedback/
+/_extensions/*/ctm-libs/
 /_extensions/*/ai-feedback/
+/_ctm-libs-source/
 /_feedback-source/
 __pycache__/
 node_modules/

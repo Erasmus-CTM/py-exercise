@@ -54,8 +54,8 @@ Load it in the page's front matter:
 
 ```yaml
 ai-feedback:
-  page-policy-files: feedback.yml
-  page-policy: gentle-coach
+  policy-files: feedback.yml
+  policy: gentle-coach
 ```
 
 Select it in an exercise with `#| feedback-policy: gentle-coach`.
