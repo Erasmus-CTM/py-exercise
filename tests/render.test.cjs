@@ -153,3 +153,15 @@ test('code, tests and settings with "</script>" stay data: the inline JSON canno
   assert.equal(data.caption, 'A </script><script>alert(5)</script> caption');
 });
 
+test('show-test-hints: false hides the hints also as a YAML boolean (it was ignored before 0.4.0)', { skip }, () => {
+  const hints = html => JSON.parse(html.match(/\(window\.__pyExercises = window\.__pyExercises \|\| \[\]\)\.push\((.*)\);/)[1]).showTestHints;
+  for (const [front, shown] of [['', true], ['py-exercise:\n  show-test-hints: false\n', false], ['py-exercise:\n  show-test-hints: "false"\n', false],
+    ['py-exercise:\n  show-test-hints: true\n', true]]) {
+    const r = render(front, exercise);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(hints(r.html), shown, front);
+  }
+  // A cell's own `#| show-test-hints:` still wins.
+  const r = render('py-exercise:\n  show-test-hints: false\n', exercise.replace('#| task: Return two.\n', '#| task: Return two.\n#| show-test-hints: true\n'));
+  assert.equal(hints(r.html), true);
+});
