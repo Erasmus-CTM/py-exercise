@@ -1,13 +1,11 @@
-local feedback = nil
--- Shared locator for ai-feedback and JSXGraph (feedback-loader.lua).
-local dependencies = nil
-local function deps()
-  dependencies = dependencies or dofile(quarto.utils.resolve_path("feedback-loader.lua"))
-  return dependencies
-end
+-- py-exercise is a part of CTM Assessment. Its library ctm-libs (settings,
+-- languages, the Python runtime, AI feedback, the JSXGraph check) is found by
+-- the canonical bootstrap, which stops the render with the install command
+-- when CTM Assessment is missing.
+local ctm = dofile(quarto.utils.resolve_path("ctm-bootstrap.lua"))("py-exercise")
 
--- Decided per page in the first pass: load ai-feedback for exercise feedback
--- or for `.ai-feedback` activities on the page; nothing otherwise.
+-- Decided per page in the first pass: ctm-libs' feedback preparation runs for
+-- exercise feedback or for `.ai-feedback` activities on the page; not otherwise.
 local needFeedback = false
 -- Seconds after which a running check offers Stop (stop-after).
 local stopAfter = 20
@@ -58,7 +56,10 @@ local submissionKey     = "py-exercise"
 
 -- Whether failed tests reveal their assertion message (default: true)
 local globalShowTestHints = true
-local feedbackEnabled = false
+-- AI feedback for the exercises: `py-exercise: feedback: true` asks for it
+-- (feedbackWanted, where it is set: feedbackOrigin); a build without AI
+-- feedback (P22) refuses it (feedbackEnabled).
+local feedbackWanted, feedbackOrigin, feedbackEnabled = false, nil, false
 
 -- Language / locale (default: English)
 local lang = "en"
@@ -89,27 +90,6 @@ local function readFile(filename)
   local content = f:read("*a")
   f:close()
   return content
-end
-
-----
--- Helper: convert a Pandoc MetaList or scalar Meta value to a plain Lua list of strings.
-----
-local function metaToList(value)
-  local result = {}
-  if not value then return result end
-  if type(value) == "table" and value[1] ~= nil then
-    for _, item in ipairs(value) do
-      local s = pandoc.utils.stringify(item):match("^%s*(.-)%s*$")
-      if s ~= "" then table.insert(result, s) end
-    end
-  else
-    local s = pandoc.utils.stringify(value)
-    for item in s:gmatch("[^,]+") do
-      local trimmed = item:match("^%s*(.-)%s*$")
-      if trimmed ~= "" then table.insert(result, trimmed) end
-    end
-  end
-  return result
 end
 
 ----
@@ -231,32 +211,24 @@ local function resolveLang(meta)
 end
 
 ----
--- Phase 1 – Meta: read global options from document YAML front matter.
+-- Phase 1 – Meta: read the page's settings. ctm-libs combines them key by key
+-- across _quarto.yml, profiles, _metadata.yml and the front matter.
 ----
 local function Meta(meta)
-  -- Resolve the language first: it must also work for documents that only set
-  -- Quarto's `lang:` and have no `py-exercise:` block, so this happens before
-  -- the early return below.
+  if not quarto.doc.is_format("html") then return meta end
+  ctm.settings.load(meta)
+  -- The language must also work for documents that only set Quarto's `lang:`.
   lang = resolveLang(meta)
-  stopAfter = deps().stopAfter(meta, "py-exercise")
+  -- `py-exercise: stop-after`, `ctm-assessment: stop-after`, 20 seconds.
+  stopAfter = ctm.runtime.stopAfter("py-exercise")
 
-  if not meta["py-exercise"] then return meta end
-  local cfg = meta["py-exercise"]
-
-  globalForbiddenImports  = metaToList(cfg["forbidden-imports"])
-  feedbackEnabled = pandoc.utils.stringify(cfg["feedback"] or "false") == "true"
-  globalForbiddenKeywords = metaToList(cfg["forbidden-keywords"])
-
-  if cfg["submission"] then
-    submissionEnabled = (pandoc.utils.stringify(cfg["submission"]) == "true")
-  end
-  if cfg["submission-key"] then
-    submissionKey = pandoc.utils.stringify(cfg["submission-key"])
-  end
-
-  if cfg["show-test-hints"] then
-    globalShowTestHints = not (pandoc.utils.stringify(cfg["show-test-hints"]) == "false")
-  end
+  globalForbiddenImports  = ctm.settings.list("py-exercise", "forbidden-imports")
+  globalForbiddenKeywords = ctm.settings.list("py-exercise", "forbidden-keywords")
+  -- true or false; other values (accepted loosely before) warn and use the default.
+  feedbackWanted, feedbackOrigin = ctm.settings.bool("py-exercise", "feedback", {loose = true, default = false})
+  submissionEnabled = ctm.settings.bool("py-exercise", "submission", {loose = true, default = false})
+  submissionKey = ctm.settings.string("py-exercise", "submission-key", {default = "py-exercise"})
+  globalShowTestHints = ctm.settings.bool("py-exercise", "show-test-hints", {loose = true, default = true})
   return meta
 end
 
@@ -274,7 +246,9 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
-  if feedbackEnabled and (not opts["task"] or opts["task"] == "") then
+  -- Asked for, feedback needs the task, also in a build without AI feedback
+  -- (both builds fail alike).
+  if feedbackWanted and (not opts["task"] or opts["task"] == "") then
     assert(false, "py-exercise: shared feedback requires #| task: with the learner's assignment.")
   end
 
@@ -289,6 +263,10 @@ local function CodeBlock(el)
     cellShowTestHints = not (opts["show-test-hints"] == "false")
   end
 
+  -- The policy name is checked whenever feedback is asked for; a build without
+  -- AI feedback (P22) leaves out every field that only AI feedback reads.
+  local selection = feedbackWanted and ctm.feedback.selection(el, opts) or nil
+  local ai = ctm.feedback.enabled()
   local exerciseData = {
     id                = exerciseCounter,
     starter           = starter,
@@ -298,11 +276,11 @@ local function CodeBlock(el)
     forbiddenImports  = forbiddenImports,
     forbiddenKeywords = forbiddenKeywords,
     showTestHints     = cellShowTestHints,
-    task              = opts["task"],
-    policySelection   = feedbackEnabled and feedback and feedback.selection(el, opts) or nil,
-    feedbackContext   = feedbackEnabled and feedback and feedback.context(el, opts) or nil,
-    feedbackLanguage  = opts["feedback-language"] or lang,
-    learnerLevel      = opts["learner-level"] or "",
+    task              = ai and opts["task"] or nil,
+    policySelection   = feedbackEnabled and selection or nil,
+    feedbackContext   = feedbackEnabled and ctm.feedback.context(el, opts) or nil,
+    feedbackLanguage  = ai and (opts["feedback-language"] or lang) or nil,
+    learnerLevel      = ai and (opts["learner-level"] or "") or nil,
   }
 
   local dataJson = quarto.json.encode(exerciseData)
@@ -324,25 +302,28 @@ end
 
 return {
   { Meta = Meta },
-  -- A page that uses a missing optional extension stops here; then decide
-  -- whether ai-feedback is needed, before callouts are marked for it.
+  -- A page that uses JSXGraph without the extension stops here; then decide
+  -- whether AI feedback is needed, before callouts are marked for it.
   { Pandoc = function(doc)
       if not quarto.doc.is_format("html") then return doc end
-      deps().requireUsed(doc, "py-exercise")
-      needFeedback = feedbackEnabled or deps().uses(doc)["ai-feedback"] == true
+      ctm.deps.requireUsed(doc, "py-exercise")
+      local exercises = false
+      doc.blocks:walk({CodeBlock = function(b) if b.classes:includes("{py-exercise}") then exercises = true end end})
+      -- A build without AI feedback refuses it and names it in its build message.
+      feedbackEnabled = ctm.feedback.request("py-exercise", feedbackWanted and exercises,
+        "feedback: true" .. (feedbackOrigin and (" in " .. feedbackOrigin) or ""))
+      needFeedback = feedbackWanted or ctm.deps.uses(doc)["ai-feedback"] == true
       return doc
     end },
   { Callout = function(c)
       if needFeedback and quarto.doc.is_format("html") then
-        feedback = feedback or deps().feedback()
-        return feedback.markCallout(c)
+        return ctm.feedback.markCallout(c)
       end
       return c
     end },
   { Pandoc = function(doc)
       if needFeedback and quarto.doc.is_format("html") then
-        feedback = feedback or deps().feedback()
-        return feedback.prepare(doc)
+        return ctm.feedback.prepare(doc)
       end
       return doc
     end },
