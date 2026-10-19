@@ -82,6 +82,15 @@ local function extensionVersion()
 end
 
 ----
+-- Helper: JSON for an inline <script>: <, > and & as \u escapes, so that
+-- text such as "</script>" in code, tests or settings cannot end the script
+-- (as ctm-libs' feedback.lua writes its data).
+----
+local function scriptJson(value)
+  return (quarto.json.encode(value):gsub("<", "\\u003c"):gsub(">", "\\u003e"):gsub("&", "\\u0026"))
+end
+
+----
 -- Helper: split a comma-separated #| option string into a list of trimmed strings.
 ----
 local function splitCommaList(str)
@@ -154,7 +163,7 @@ local function ensureExerciseSetup()
     stopAfter     = stopAfter,
   }
   quarto.doc.include_text("before-body",
-    "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
+    "<script>window.__pyExerciseConfig = " .. scriptJson(config) .. ";</script>")
 
   ctm.runtime.use()
   ctm.locale.use("py-exercise")
@@ -246,7 +255,7 @@ local function CodeBlock(el)
     learnerLevel      = ai and (opts["learner-level"] or "") or nil,
   }
 
-  local dataJson = quarto.json.encode(exerciseData)
+  local dataJson = scriptJson(exerciseData)
 
   local noscriptMsg = ctm.locale.text("py-exercise", "noscript", lang)
   local html = table.concat({

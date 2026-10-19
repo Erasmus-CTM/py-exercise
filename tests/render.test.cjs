@@ -134,3 +134,22 @@ test('values accepted loosely before keep their result and warn', { skip }, () =
   assert.equal(config(r.html).submission, false);
   assert.match(r.html, /"showTestHints":true/);
 });
+
+test('code, tests and settings with "</script>" stay data: the inline JSON cannot end its script', { skip }, () => {
+  const key = 'k</script><script>alert(1)</script>';
+  const starter = 'def tag():\n    return "</script><script>alert(2)</script>"';
+  const tests = 'assert tag() != "</script><script>alert(3)</script>", "</script><script>alert(4)</script>"';
+  const r = render('py-exercise:\n  submission: true\n  submission-key: "' + key + '"\n',
+    '```{py-exercise}\n#| label: inject\n#| caption: A </script><script>alert(5)</script> caption\n' + starter + '\n## TESTS ##\n' + tests + '\n```\n');
+  assert.equal(r.status, 0, r.stderr);
+  // No script of its own: the text stays inside the JSON data.
+  const doc = new (require('jsdom').JSDOM)(r.html).window.document;
+  assert.deepEqual([...doc.querySelectorAll('script')].filter(script => /^\s*alert\(/.test(script.textContent)), []);
+  assert.doesNotMatch(r.html, /<script>alert\(/);
+  assert.equal(config(r.html).submissionKey, key);
+  const data = JSON.parse(r.html.match(/\(window\.__pyExercises = window\.__pyExercises \|\| \[\]\)\.push\((.*)\);/)[1]);
+  assert.equal(data.starter, starter);
+  assert.equal(data.tests, tests);
+  assert.equal(data.caption, 'A </script><script>alert(5)</script> caption');
+});
+
