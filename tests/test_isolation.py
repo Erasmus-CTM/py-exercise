@@ -1,7 +1,9 @@
 """Learner code checked by py-exercise cannot change the interpreter for the
-other components on the page (the shared _ctm_guard from pyodide-runtime.js)."""
+other components on the page (the shared _ctm_guard from ctm-libs'
+runtime/pyodide-runtime.js)."""
 import builtins
 import io
+import os
 import re
 import sys
 import types
@@ -13,8 +15,19 @@ sys.path.insert(0, str(Path(__file__).parent))
 import test_example_checks as harness  # noqa: E402
 
 
+def ctm_libs():
+    """ctm-libs: CTM_LIBS_EXTENSION, else _extensions/ctm-libs or _extensions/*/ctm-libs."""
+    if os.environ.get('CTM_LIBS_EXTENSION'):
+        return Path(os.environ['CTM_LIBS_EXTENSION'])
+    for candidate in [ROOT / '_extensions/ctm-libs', *sorted((ROOT / '_extensions').glob('*/ctm-libs'))]:
+        if (candidate / 'lua/ctm.lua').is_file():
+            return candidate
+    raise FileNotFoundError('Install ctm-libs first (quarto add Erasmus-CTM/ctm-libs@main --no-prompt), '
+                            'or set CTM_LIBS_EXTENSION to its _extensions/ctm-libs folder.')
+
+
 def guard_source():
-    runtime = (ROOT / '_extensions/py-exercise/shared/pyodide-runtime.js').read_text(encoding='utf-8')
+    runtime = (ctm_libs() / 'runtime/pyodide-runtime.js').read_text(encoding='utf-8')
     body = re.search(r"var GUARD_PY = \[\n(.*?)\n\s*\]\.join\('\\n'\);", runtime, re.S).group(1)
     return '\n'.join(eval(line.strip().rstrip(',')) for line in body.splitlines() if line.strip())
 

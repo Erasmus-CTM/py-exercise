@@ -7,9 +7,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 
-// As the filter injects them: the shared runtime, then the exercise script.
-const source = ['shared/pyodide-runtime.js', 'py-exercise.js']
-  .map(file => fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise', file), 'utf8')).join('\n');
+const { LOCALE, RUNTIME, sources } = require('./helpers/ctm-libs.cjs');
+
+// As the page loads them: ctm-libs' runtime and catalogue, then the exercise script.
+const source = [...sources([...RUNTIME, ...LOCALE]),
+  fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise/py-exercise.js'), 'utf8')].join('\n');
 const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 // One namespace shared by all exercises, like Pyodide's globals; the private
