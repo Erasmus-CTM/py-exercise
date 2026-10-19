@@ -61,20 +61,15 @@ local globalShowTestHints = true
 -- feedback (P22) refuses it (feedbackEnabled).
 local feedbackWanted, feedbackOrigin, feedbackEnabled = false, nil, false
 
--- Language / locale (default: English)
+-- Interface language, resolved per page by ctm-libs (see Meta below):
+--   1. `py-exercise: lang: xx`     – explicit override
+--   2. `ctm-assessment: lang: xx`  – every component of the project
+--   3. Quarto's own `lang:`        – set per profile in a multilingual project
+--   4. "en"                        – fallback
+-- Region subtags are dropped ("de-DE" -> "de", "no" and "nn" -> "nb");
+-- unsupported languages fall back to English instead of failing the render.
+-- Every interface text is in ctm-libs' message catalogue (locales/py-exercise.js).
 local lang = "en"
-
--- Supported locales. Extend this set together with LOCALES in py-exercise.js.
-local supportedLangs = {
-  ["en"] = true,
-  ["de"] = true
-}
-
--- Noscript messages per locale
-local noscriptMessages = {
-  en = "Please enable JavaScript to load the interactive exercise.",
-  de = "Bitte JavaScript aktivieren, um die interaktive Aufgabe zu laden.",
-}
 
 ----
 -- Helper: read a file that lives next to this .lua filter
@@ -170,44 +165,14 @@ local function ensureExerciseSetup()
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. quarto.json.encode(config) .. ";</script>")
 
+  -- The message catalogue (CTMLocales), read by py-exercise.js.
+  ctm.locale.use("py-exercise")
+
   -- JS
   local js = readFile("shared/pyodide-runtime.js") .. "\n"
     .. (feedbackEnabled and (readFile("py-exercise-feedback.js") .. "\n") or "") .. readFile("py-exercise.js")
   quarto.doc.include_text("after-body",
     "<script type=\"text/javascript\">\n" .. js .. "\n</script>")
-end
-
-----
--- Determine the UI language for this render pass.
---
--- Order of precedence:
---   1. `py-exercise: lang: xx`  – explicit override
---   2. Quarto's own `lang:`     – set per profile in a multilingual project
---   3. "en"                     – fallback
---
--- Region subtags are dropped ("de-DE" -> "de"); unsupported languages fall
--- back to English instead of failing the render.
-----
-local function resolveLang(meta)
-  local raw = nil
-
-  local cfg = meta["py-exercise"]
-  if cfg and cfg["lang"] then
-    raw = pandoc.utils.stringify(cfg["lang"])
-  elseif meta["lang"] then
-    raw = pandoc.utils.stringify(meta["lang"])
-  end
-
-  if raw == nil or raw == "" then
-    return "en"
-  end
-
-  local base = raw:lower():match("^(%a+)")
-  if base and supportedLangs[base] then
-    return base
-  end
-
-  return "en"
 end
 
 ----
@@ -217,8 +182,7 @@ end
 local function Meta(meta)
   if not quarto.doc.is_format("html") then return meta end
   ctm.settings.load(meta)
-  -- The language must also work for documents that only set Quarto's `lang:`.
-  lang = resolveLang(meta)
+  lang = ctm.locale.resolve("py-exercise")
   -- `py-exercise: stop-after`, `ctm-assessment: stop-after`, 20 seconds.
   stopAfter = ctm.runtime.stopAfter("py-exercise")
 
@@ -285,7 +249,7 @@ local function CodeBlock(el)
 
   local dataJson = quarto.json.encode(exerciseData)
 
-  local noscriptMsg = noscriptMessages[lang] or noscriptMessages["en"]
+  local noscriptMsg = ctm.locale.text("py-exercise", "noscript", lang)
   local html = table.concat({
     '<div class="py-exercise-cell" id="' .. divId .. '">',
     '  <noscript>',

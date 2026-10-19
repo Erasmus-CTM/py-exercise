@@ -2,109 +2,6 @@
   'use strict';
 
   // ---------------------------------------------------------------------------
-  // Locales – add new languages here
-  // ---------------------------------------------------------------------------
-
-  var LOCALES = {
-    en: {
-      btnCheck:             '<i class="fa-solid fa-check"></i> Check',
-      btnCheckTitle:        'Run checks (Shift+Enter)',
-      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Reset',
-      btnResetTitle:        'Restore starter code',
-      running:              '⏳ Checking…',
-      errorHeader:          '❌ Error in code:',
-      unexpectedError:      '❌ Unexpected error:',
-      editorUnavailable:    'The code editor could not be loaded (no connection to cdn.jsdelivr.net?). Reload the page to try again.',
-      pythonUnavailable:    'Python could not be loaded (no connection to cdn.jsdelivr.net?). Check the connection and press Check again.',
-      slowCheck:            'Still running – an endless loop?',
-      slowLoad:             'Python is still loading.',
-      stop:                 'Stop',
-      stopped:              'Stopped. Python was restarted (interactive cells on this page lost their variables).',
-      stdoutLabel:          'Output:',
-      allPassed: function (n) {
-        return '✅ All ' + n + ' test' + (n === 1 ? '' : 's') + ' passed!';
-      },
-      someFailed: function (p, t) {
-        return '❌ ' + p + ' of ' + t + ' test' + (t === 1 ? '' : 's') + ' passed';
-      },
-      violationsHeader:     '🚫 Not allowed:',
-      // Submission UI
-      submissionTitle:      '📋 Submission',
-      studentIdLabel:       'Student ID',
-      studentIdPlaceholder: 'e.g. s123456',
-      quizIdLabel:          'Quiz ID',
-      quizIdPlaceholder:    'e.g. quiz-01',
-      exportBtn:            '<i class="fa-solid fa-file-export"></i> Export results',
-      outputLabel:          'Copy encoded string and submit:',
-      copyBtn:              '<i class="fa-regular fa-copy"></i> Copy',
-      copyOk:               '<i class="fa-solid fa-check"></i> Copied!',
-      validationError:      'Please fill in Student ID and Quiz ID.',
-      encodingError:        'Error during encoding: ',
-      // Download
-      downloadBtn:          '<i class="fa-solid fa-download"></i> Download as JSON',
-      downloadBtnTitle:     'Save current code and test results for all exercises',
-      downloadHint:         'Saves your code and test results for personal documentation.',
-      downloadFilename:     'exercises-',
-      // Python message templates – use {} as placeholder for str.format()
-      msgForbiddenImport:   "Forbidden import: '{}'",
-      msgForbiddenFunction: "Forbidden function: '{}'",
-      msgForbiddenMethod:   "Forbidden method: '.{}'",
-      msgForbiddenKeyword:  "Forbidden keyword: '{}'",
-      msgAssertionFailed:   'Assertion failed',
-      msgTestError:         'Error: {}',
-      msgSyntaxError:       'Syntax error in tests: {}',
-    },
-    de: {
-      btnCheck:             '<i class="fa-solid fa-check"></i> Überprüfen',
-      btnCheckTitle:        'Code prüfen (Shift+Enter)',
-      btnReset:             '<i class="fa-solid fa-arrows-rotate"></i> Zurücksetzen',
-      btnResetTitle:        'Starter-Code wiederherstellen',
-      running:              '⏳ Überprüfe…',
-      errorHeader:          '❌ Fehler im Code:',
-      unexpectedError:      '❌ Unerwarteter Fehler:',
-      editorUnavailable:    'Der Code-Editor konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Lade die Seite neu, um es erneut zu versuchen.',
-      pythonUnavailable:    'Python konnte nicht geladen werden (keine Verbindung zu cdn.jsdelivr.net?). Prüfe die Verbindung und klicke erneut auf Überprüfen.',
-      slowCheck:            'Läuft noch – eine Endlosschleife?',
-      slowLoad:             'Python wird noch geladen.',
-      stop:                 'Abbrechen',
-      stopped:              'Abgebrochen. Python wurde neu gestartet (interaktive Zellen auf dieser Seite haben ihre Variablen verloren).',
-      stdoutLabel:          'Ausgabe:',
-      allPassed: function (n) {
-        return '✅ Alle ' + n + ' Test' + (n === 1 ? '' : 's') + ' bestanden!';
-      },
-      someFailed: function (p, t) {
-        return '❌ ' + p + ' von ' + t + ' Test' + (t === 1 ? '' : 's') + ' bestanden';
-      },
-      violationsHeader:     '🚫 Nicht erlaubt:',
-      // Submission UI
-      submissionTitle:      '📋 Abgabe',
-      studentIdLabel:       'Student-ID',
-      studentIdPlaceholder: 'z.B. s123456',
-      quizIdLabel:          'Quiz-ID',
-      quizIdPlaceholder:    'z.B. quiz-01',
-      exportBtn:            '<i class="fa-solid fa-file-export"></i> Ergebnis exportieren',
-      outputLabel:          'Kodierten String kopieren und abgeben:',
-      copyBtn:              '<i class="fa-regular fa-copy"></i> Kopieren',
-      copyOk:               '<i class="fa-solid fa-check"></i> Kopiert!',
-      validationError:      'Bitte Student-ID und Quiz-ID ausfüllen.',
-      encodingError:        'Fehler beim Kodieren: ',
-      // Download
-      downloadBtn:          '<i class="fa-solid fa-download"></i> Als JSON herunterladen',
-      downloadBtnTitle:     'Aktuellen Code und Testergebnisse aller Aufgaben speichern',
-      downloadHint:         'Speichert Code-Eingaben und Testergebnisse zur eigenen Dokumentation.',
-      downloadFilename:     'aufgaben-',
-      // Python message templates
-      msgForbiddenImport:   "Verbotener Import: '{}'",
-      msgForbiddenFunction: "Verbotene Funktion: '{}'",
-      msgForbiddenMethod:   "Verbotene Methode: '.{}'",
-      msgForbiddenKeyword:  "Verbotenes Schlüsselwort: '{}'",
-      msgAssertionFailed:   'Assertion fehlgeschlagen',
-      msgTestError:         'Fehler: {}',
-      msgSyntaxError:       'Syntaxfehler in Tests: {}',
-    },
-  };
-
-  // ---------------------------------------------------------------------------
   // Utilities
   // ---------------------------------------------------------------------------
 
@@ -161,7 +58,9 @@
   // ---------------------------------------------------------------------------
 
   var submissionConfig = window.__pyExerciseConfig || { submission: false, submissionKey: 'py-exercise', lang: 'en' };
-  var L = LOCALES[submissionConfig.lang] || LOCALES['en'];
+  // Interface texts: ctm-libs' message catalogue (locales/py-exercise.js),
+  // compiled for the page's language (an unknown language gives English).
+  var L = CTMLocales.table('py-exercise', submissionConfig.lang);
 
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
   var exerciseResults = {};
