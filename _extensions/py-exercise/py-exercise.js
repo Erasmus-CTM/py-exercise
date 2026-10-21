@@ -26,13 +26,13 @@
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
-  // use), we load the AMD loader from CDN and let it fetch the editor itself.
+  // use), the shared resolver supplies the same pinned package in both modes.
   async function ensureMonaco() {
-    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46/min/vs';
+    var assetBase = CTMAssets.url('monaco-editor', 'min/vs');
     if (typeof require === 'undefined') {
-      await loadScript(cdnBase + '/loader.js');
+      await loadScript(assetBase + '/loader.js');
     }
-    require.config({ paths: { vs: cdnBase } });
+    require.config({ paths: { vs: assetBase } });
     await new Promise(function (resolve, reject) {
       require(['vs/editor/editor.main'], function () { resolve(); }, reject);
     });

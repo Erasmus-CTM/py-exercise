@@ -174,6 +174,7 @@ local function ensureExerciseSetup()
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. scriptJson(config) .. ";</script>")
 
+  ctm.assets.use()
   ctm.runtime.use()
   ctm.locale.use("py-exercise")
   local version = extensionVersion()
@@ -227,6 +228,14 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
+  -- The umbrella collector receives exactly the fragments this component runs.
+  -- It is initialized by the page hook, after this filter has been loaded.
+  local imports = rawget(_G, "__ctmAuthorImports")
+  if imports and type(imports.add) == "function" then
+    local origin = "py-exercise:" .. (opts["label"] or divId)
+    imports.add({source = starter, packages = {}, origin = origin .. ":starter"})
+    imports.add({source = tests, packages = {}, origin = origin .. ":tests"})
+  end
   -- Asked for, feedback needs the task, also in a build without AI feedback
   -- (both builds fail alike).
   if feedbackWanted and (not opts["task"] or opts["task"] == "") then
