@@ -1,5 +1,17 @@
 # Changes
 
+## 0.5.0 (CTM Assessment consolidation, phase B3)
+
+- Code and checked results use ctm-libs' shared answer store. Saving settings,
+  source changes, page/course deletion and unavailable storage follow the shared policy.
+- Existing pyex code is migrated lazily from HTML, extensionless and index URLs.
+  The current path wins; cached-page writes supersede migrated records.
+- Reset cancels the shared pending save and suppresses Monaco's starter change.
+  Returning to starter code removes the answer; restored code never runs Python.
+- Changed-source answers are offered read-only. Last checked results are muted
+  until a new check; results for code edited during a check are discarded.
+- Requires the phase B1 ctm-libs store and UI catalogue.
+
 ## Unreleased
 
 - `ctm-bootstrap.lua` is ctm-libs' new copy (CTM Assessment consolidation

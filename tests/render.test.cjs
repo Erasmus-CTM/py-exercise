@@ -165,3 +165,20 @@ test('show-test-hints: false hides the hints also as a YAML boolean (it was igno
   const r = render('py-exercise:\n  show-test-hints: false\n', exercise.replace('#| task: Return two.\n', '#| task: Return two.\n#| show-test-hints: true\n'));
   assert.equal(hints(r.html), true);
 });
+
+
+test('store metadata uses authored labels, changes with exercise source and honors save false', { skip }, () => {
+  const labeled = exercise.replace('#| task:', '#| label: saved-task\n#| task:');
+  const first = render('', labeled);
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.html, /data-ctm-id="saved-task"/);
+  assert.match(first.html, /data-ctm-save="true"/);
+  assert.match(first.html, /ctm-store-manifest/);
+  const hash = first.html.match(/data-ctm-source="([a-f0-9]{16})"/)[1];
+  const edited = render('', labeled.replace('return 0', 'return 1'));
+  assert.equal(edited.status, 0, edited.stderr);
+  assert.notEqual(edited.html.match(/data-ctm-source="([a-f0-9]{16})"/)[1], hash);
+  const disabled = render('', labeled.replace('#| label:', '#| save: false\n#| label:'));
+  assert.equal(disabled.status, 0, disabled.stderr);
+  assert.match(disabled.html, /data-ctm-save="false"/);
+});

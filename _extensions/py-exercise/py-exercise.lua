@@ -218,6 +218,10 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
+  local source = pandoc.utils.sha1(el.text):sub(1, 16)
+  local storage = ctm.ui.exercise({
+    component = "py-exercise", id = opts["label"], source = source, save = opts["save"],
+  })
   -- Asked for, feedback needs the task, also in a build without AI feedback
   -- (both builds fail alike).
   if feedbackWanted and (not opts["task"] or opts["task"] == "") then
@@ -244,6 +248,9 @@ local function CodeBlock(el)
     starter           = starter,
     tests             = tests,
     label             = opts["label"]   or divId,
+    storeId           = opts["label"],
+    source            = source,
+    save              = storage.save,
     caption           = opts["caption"] or nil,
     forbiddenImports  = forbiddenImports,
     forbiddenKeywords = forbiddenKeywords,
@@ -258,8 +265,14 @@ local function CodeBlock(el)
   local dataJson = scriptJson(exerciseData)
 
   local noscriptMsg = ctm.locale.text("py-exercise", "noscript", lang)
+  local attributes = {}
+  for _, name in ipairs({"data-ctm-component", "data-ctm-id", "data-ctm-source", "data-ctm-save"}) do
+    local value = tostring(storage.attributes[name] or "")
+    value = value:gsub("&", "&amp;"):gsub('"', "&quot;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+    attributes[#attributes + 1] = name .. '="' .. value .. '"'
+  end
   local html = table.concat({
-    '<div class="py-exercise-cell" id="' .. divId .. '">',
+    '<div class="py-exercise-cell" id="' .. divId .. '" ' .. table.concat(attributes, " ") .. '>',
     '  <noscript>',
     '    ' .. noscriptMsg,
     '  </noscript>',
@@ -274,6 +287,11 @@ end
 
 return {
   { Meta = Meta },
+  { Pandoc = function(doc)
+      if not quarto.doc.is_format("html") then return doc end
+      if ctm.progress and ctm.progress.prepare then return ctm.progress.prepare(doc) end
+      return doc
+    end },
   -- A page that uses JSXGraph without the extension stops here; then decide
   -- whether AI feedback is needed, before callouts are marked for it.
   { Pandoc = function(doc)
@@ -300,4 +318,8 @@ return {
       return doc
     end },
   { CodeBlock = CodeBlock },
+  { Pandoc = function(doc)
+      if not quarto.doc.is_format("html") then return doc end
+      return ctm.ui.finalize(doc)
+    end },
 }

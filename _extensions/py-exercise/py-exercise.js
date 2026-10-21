@@ -61,6 +61,7 @@
   // Interface texts: ctm-libs' message catalogue (locales/py-exercise.js),
   // compiled for the page's language (an unknown language gives English).
   var L = CTMLocales.table('py-exercise', submissionConfig.lang);
+  var StoreText = CTMLocales.table('ui', submissionConfig.lang);
 
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
   var exerciseResults = {};
@@ -274,6 +275,37 @@
   // Exercise cell setup
   // ---------------------------------------------------------------------------
 
+  // py-exercise alone knows its old key format. The shared store decides
+  // whether migration is enabled and commits the new record before removal.
+  function legacyCode(label, starterCode) {
+    function paths() {
+      var current = window.location.pathname, alternatives = [current];
+      function add(value) { if (alternatives.indexOf(value) < 0) alternatives.push(value); }
+      var base = current.replace(/\.html$/, '');
+      if (/\/$/.test(base)) base += 'index';
+      if (/\/index$/.test(base)) {
+        add(base + '.html'); add(base); add(base.slice(0, -5));
+      } else {
+        add(base + '.html'); add(base);
+      }
+      return alternatives;
+    }
+    return {
+      read: function () {
+        var candidates = paths().map(function (page) { return 'pyex|' + page + '|' + label; });
+        var code = null, found = [];
+        candidates.forEach(function (key) {
+          var value = window.localStorage.getItem(key);
+          if (value !== null) { found.push(key); if (code === null) code = value; }
+        });
+        return code === null ? null : {inputs: code === starterCode ? null : {code: code}, keys: found};
+      },
+      remove: function (candidate) {
+        candidate.keys.forEach(function (key) { window.localStorage.removeItem(key); });
+      }
+    };
+  }
+
   function setupExercise(exerciseData) {
     var container = document.getElementById('py-exercise-' + exerciseData.id);
     if (!container) return;
@@ -288,10 +320,6 @@
     var showHints         = exerciseData.showTestHints !== false;
     // caption is metadata only (used in downloadAll JSON), not rendered visually
 
-    // localStorage key scoped to this page + label
-    var storageKey = 'pyex|' + window.location.pathname + '|' + label;
-    var savedCode = null;
-    try { savedCode = localStorage.getItem(storageKey); } catch (e) {}
 
     // Monaco editor container
     var editorContainer = document.createElement('div');
@@ -323,6 +351,10 @@
     container.appendChild(resultArea);
 
     var editor;
+    var storeHandle = null;
+    var savedOffer = null;
+    var writingEditor = false;
+    var editRevision = 0;
     var assessment = null;
     var feedbackAdapter = null;
     function clearFeedback() {
@@ -331,7 +363,7 @@
     }
     require(['vs/editor/editor.main'], function () {
       editor = monaco.editor.create(editorContainer, {
-        value: savedCode !== null ? savedCode : starterCode,
+        value: starterCode,
         language: 'python',
         theme: 'vs',
         automaticLayout: true,
@@ -365,14 +397,77 @@
       editor.onDidContentSizeChange(updateHeight);
       updateHeight();
 
-      // Persist code across reloads
-      var saveTimer;
-      editor.onDidChangeModelContent(function () {
+      // Monaco fires a change for setValue too. Restore and reset must not
+      // create a fresh save or make an in-flight check current again.
+      function setCode(code) {
+        writingEditor = true;
+        try { editor.setValue(code); } finally { writingEditor = false; }
+        editRevision++;
+      }
+      function clearCode() {
+        if (savedOffer) { savedOffer.remove(); savedOffer = null; }
         clearFeedback();
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(function () {
-          try { localStorage.setItem(storageKey, editor.getValue()); } catch (e) {}
-        }, 500);
+        feedbackAdapter?.reset();
+        setCode(starterCode);
+        delete exerciseResults[label];
+        resultArea.innerHTML = '';
+      }
+      if (globalThis.CTMStore) {
+        storeHandle = CTMStore.register({
+          component: 'py-exercise', id: exerciseData.storeId || label,
+          element: container, source: exerciseData.source || '', save: exerciseData.save !== false,
+          read: function () { var code = editor.getValue(); return code === starterCode ? null : {code: code}; },
+          write: function (inputs, meta) {
+            if (inputs && typeof inputs.code === 'string') setCode(inputs.code);
+            clearFeedback();
+            delete exerciseResults[label];
+            resultArea.innerHTML = '';
+          },
+          clear: clearCode,
+          legacy: [legacyCode(exerciseData.storeId || label, starterCode)],
+          exportItem: function () {
+            var code = editor.getValue();
+            var parts = [{kind: 'code', label: label, text: code}];
+            if (assessment && assessment.code === code && assessment.result.stdout) {
+              parts.push({kind: 'output', label: label, text: assessment.result.stdout});
+            }
+            return {title: exerciseData.caption || label, parts: parts};
+          }
+        });
+        var restored = storeHandle.restore();
+        if (restored && restored.record) {
+          if (restored.state === 'changed' || restored.state === 'withdrawn') {
+            savedOffer = document.createElement('details');
+            savedOffer.className = 'py-exercise-saved-outdated';
+            var summary = document.createElement('summary');
+            summary.textContent = StoreText.sourceChanged + ' ' + StoreText.showSaved;
+            var oldCode = document.createElement('pre');
+            oldCode.textContent = restored.record.inputs && restored.record.inputs.code || '';
+            savedOffer.appendChild(summary); savedOffer.appendChild(oldCode);
+            container.appendChild(savedOffer);
+          }
+          var last = restored.record.result;
+          if (last) {
+            var previousResult = document.createElement('div');
+            previousResult.className = 'py-exercise-saved-result';
+            previousResult.style.opacity = '0.65';
+            var statusText = {correct: StoreText.statusCorrect, partial: StoreText.statusPartial,
+              wrong: StoreText.statusWrong, invalid: StoreText.statusInvalid}[last.status] || last.status;
+            var date = last.at ? new Date(last.at).toLocaleDateString(submissionConfig.lang || 'en') : '';
+            previousResult.textContent = StoreText.lastChecked(date, statusText,
+              typeof last.score === 'number' ? Math.round(last.score * 100) : 0) +
+              (restored.outdated ? ' — ' + StoreText.outdated : '');
+            resultArea.appendChild(previousResult);
+          }
+        }
+      }
+      editor.onDidChangeModelContent(function () {
+        if (writingEditor) return;
+        editRevision++;
+        clearFeedback();
+        delete exerciseResults[label];
+        resultArea.innerHTML = '';
+        if (storeHandle) storeHandle.changed();
       });
 
       // addCommand registers a global keybinding (the last registration wins),
@@ -403,6 +498,7 @@
       resetBtn.disabled = true;
 
       var studentCode = editor.getValue();
+      var checkedRevision = editRevision;
 
       try {
         stops = runtime.stopCount();
@@ -449,12 +545,22 @@
           outcome = await check();
         }
         if (outcome.violations) {
+          if (checkedRevision !== editRevision) return;
           renderViolations(resultArea, outcome.violations);
+          if (storeHandle) storeHandle.result({status: 'invalid', score: 0});
           if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {status: 'blocked by assignment restrictions'}};
           return;
         }
         var data = outcome.data;
+        if (checkedRevision !== editRevision) return;
         renderResult(resultArea, data, label, showHints);
+        if (storeHandle) {
+          var total = (data.tests || []).length;
+          var passed = (data.tests || []).filter(function (test) { return test.passed; }).length;
+          storeHandle.result({status: data.student_error || !total ? 'invalid' :
+            passed === total ? 'correct' : passed ? 'partial' : 'wrong',
+            score: total ? passed / total : 0});
+        }
         if (editor.getValue() === studentCode) assessment = {code: studentCode, result: {
           status: data.student_error ? 'learner code raised an error' : 'checked',
           passed: (data.tests || []).filter(function (t) { return t.passed; }).length,
@@ -463,6 +569,7 @@
         }};
 
       } catch (err) {
+        if (checkedRevision !== editRevision) return;
         // Stopped from this or any other component's Stop button.
         resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
@@ -482,11 +589,18 @@
 
     checkBtn.onclick = runCheck;
     resetBtn.onclick = function () {
-      clearFeedback();
-      feedbackAdapter?.reset();
-      if (editor) editor.setValue(starterCode);
-      try { localStorage.removeItem(storageKey); } catch (e) {}
-      resultArea.innerHTML = '';
+      if (storeHandle) storeHandle.clear();
+      else {
+        clearFeedback();
+        feedbackAdapter?.reset();
+        if (editor) {
+          writingEditor = true;
+          try { editor.setValue(starterCode); } finally { writingEditor = false; }
+          editRevision++;
+        }
+        delete exerciseResults[label];
+        resultArea.innerHTML = '';
+      }
     };
   }
 
