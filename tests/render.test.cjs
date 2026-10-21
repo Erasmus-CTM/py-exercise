@@ -188,7 +188,7 @@ test('source revisions include effective grading restrictions but exclude page p
   try {
     fs.cpSync(path.join(__dirname,'../_extensions/py-exercise'),path.join(dir,'_extensions/py-exercise'),{recursive:true});
     install(dir);
-    const body='~~~{py-exercise}\n#| label: stable-rule-task\n#| task: Sort values.\n#| forbidden-imports: pathlib\n#| forbidden-keywords: eval\nvalues = sorted([2, 1])\n## TESTS ##\nassert values == [1, 2]\n~~~\n';
+    const body='```{py-exercise}\n#| label: stable-rule-task\n#| task: Sort values.\n#| forbidden-imports: pathlib\n#| forbidden-keywords: eval\nvalues = sorted([2, 1])\n## TESTS ##\nassert values == [1, 2]\n```\n';
     const pages={
       base:'py-exercise:\n  forbidden-imports: []\n  forbidden-keywords: []\n',
       imports:'py-exercise:\n  forbidden-imports: [os]\n  forbidden-keywords: []\n',
@@ -204,6 +204,7 @@ test('source revisions include effective grading restrictions but exclude page p
     assert.equal(result.status,0,result.stderr);
     const hashes=Object.fromEntries(Object.keys(pages).map(name=>{
       const html=fs.readFileSync(path.join(dir,name+'.html'),'utf8');
+      assert.match(html,/class="py-exercise-cell"/,name+" renders the production exercise root");
       const hash=html.match(/data-ctm-source="([a-f0-9]{16})"/)?.[1];
       assert.ok(hash,name+' has a rendered source revision');
       return [name,hash];

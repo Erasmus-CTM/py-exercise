@@ -327,7 +327,7 @@ test('store restore never checks Python or schedules a synthetic editor save; Re
   assert.equal(editors[0].getValue(), 'saved code');
   assert.equal(py.runs, 0);
   assert.equal(calls.changes, 0);
-  assert.match(result(w, 1), /50%/);
+  assert.match(result(w, 1), /partly correct\s*\(50\s*%\)/);
   editors[0].setValue('edit before reset');
   assert.equal(calls.changes, 1);
   w.document.querySelector('.py-exercise-reset').click();
