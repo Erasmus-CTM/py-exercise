@@ -1,5 +1,11 @@
 # Changes
 
+## Unreleased
+
+- `ctm-bootstrap.lua` is ctm-libs' new copy (CTM Assessment consolidation
+  step 3): the bootstrap takes options for pyodide-interaktiv 1.9. py-exercise
+  passes none, so its messages and behaviour are unchanged.
+
 ## 0.4.0 (CTM Assessment 0.9.0)
 
 py-exercise is a part of CTM Assessment and loads its library ctm-libs for
