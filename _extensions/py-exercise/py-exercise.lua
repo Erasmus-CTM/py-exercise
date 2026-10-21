@@ -220,7 +220,7 @@ local function CodeBlock(el)
   local starter, tests = splitCode(code)
   local source = pandoc.utils.sha1(el.text):sub(1, 16)
   local storage = ctm.ui.exercise({
-    component = "py-exercise", id = opts["label"], source = source, save = opts["save"],
+    component = "py-exercise", id = opts["label"], block = el, source = source, save = opts["save"],
   })
   -- Asked for, feedback needs the task, also in a build without AI feedback
   -- (both builds fail alike).
@@ -266,7 +266,7 @@ local function CodeBlock(el)
 
   local noscriptMsg = ctm.locale.text("py-exercise", "noscript", lang)
   local attributes = {}
-  for _, name in ipairs({"data-ctm-component", "data-ctm-id", "data-ctm-source", "data-ctm-save"}) do
+  for _, name in ipairs({"data-ctm-component", "data-ctm-id", "data-ctm-runtime-id", "data-ctm-source", "data-ctm-save"}) do
     local value = tostring(storage.attributes[name] or "")
     value = value:gsub("&", "&amp;"):gsub('"', "&quot;"):gsub("<", "&lt;"):gsub(">", "&gt;")
     attributes[#attributes + 1] = name .. '="' .. value .. '"'
