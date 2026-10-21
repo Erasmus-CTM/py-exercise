@@ -118,6 +118,15 @@ local function mergeLists(base, extra)
   return result
 end
 
+-- Rules are sets for grading. Their order in metadata must not change the
+-- revision, and presentation/submission settings are not checker inputs.
+local function sortedRules(values)
+  local out = {}
+  for i, value in ipairs(values) do out[i] = value end
+  table.sort(out)
+  return out
+end
+
 ----
 -- Helper: parse #| key: value lines
 ----
@@ -218,10 +227,6 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
-  local source = pandoc.utils.sha1(el.text):sub(1, 16)
-  local storage = ctm.ui.exercise({
-    component = "py-exercise", id = opts["label"], block = el, source = source, save = opts["save"],
-  })
   -- Asked for, feedback needs the task, also in a build without AI feedback
   -- (both builds fail alike).
   if feedbackWanted and (not opts["task"] or opts["task"] == "") then
@@ -232,6 +237,15 @@ local function CodeBlock(el)
   local cellForbiddenKeywords = splitCommaList(opts["forbidden-keywords"])
   local forbiddenImports  = mergeLists(globalForbiddenImports,  cellForbiddenImports)
   local forbiddenKeywords = mergeLists(globalForbiddenKeywords, cellForbiddenKeywords)
+
+  -- The unchanged code block can be checked under different page-wide rules.
+  -- Mark that saved result outdated before a learner explicitly checks again.
+  local source = pandoc.utils.sha1(quarto.json.encode({
+    el.text, sortedRules(forbiddenImports), sortedRules(forbiddenKeywords)
+  })):sub(1, 16)
+  local storage = ctm.ui.exercise({
+    component = "py-exercise", id = opts["label"], block = el, source = source, save = opts["save"],
+  })
 
   -- Per-cell show-hints: "false" disables hints; anything else (or absent) keeps global default
   local cellShowTestHints = globalShowTestHints
