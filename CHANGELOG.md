@@ -10,6 +10,8 @@
   Returning to starter code removes the answer; restored code never runs Python.
 - Changed-source answers are offered read-only. Last checked results are muted
   until a new check; results for code edited during a check are discarded.
+- Every exercise offers Copy answer, including when saving is off. Shared
+  ctm-libs clipboard and selected-text fallbacks work without Python.
 - Requires the phase B1 ctm-libs store and UI catalogue.
 
 ## Unreleased

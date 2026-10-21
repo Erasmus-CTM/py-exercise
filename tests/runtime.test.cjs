@@ -416,3 +416,32 @@ test('a starter re-saved by an old cached page migrates as a deletion marker', a
   assert.equal(w.localStorage.getItem('pyex|/p.html|add'), null);
   dom.window.close();
 });
+
+
+test('Copy answer is available with saving off and copies current code without running Python', async () => {
+  const data = exercises().slice(0, 1);
+  data[0].save = false;
+  const {w, dom, editors} = page(data);
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const copied = [];
+  w.CTMCopy = {text: async (text, options) => { copied.push({text, options}); return {method: 'clipboard'}; }};
+  const calls = observeStore(w);
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.equal(calls.options.save, false);
+  const button = w.document.querySelector('.py-exercise-copy');
+  assert.equal(button.disabled, false);
+  editors[0].setValue('print("my unsaved answer")');
+  button.click();
+  await until(() => copied.length === 1);
+  assert.equal(copied[0].text, 'print("my unsaved answer")');
+  assert.ok(copied[0].options.label.includes('add'));
+  assert.equal(py.runs, 0);
+  w.document.querySelector('.py-exercise-reset').click();
+  button.click();
+  await until(() => copied.length === 2);
+  assert.equal(copied[1].text, data[0].starter);
+  assert.equal(py.runs, 0);
+  dom.window.close();
+});

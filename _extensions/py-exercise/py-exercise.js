@@ -342,8 +342,20 @@
     resetBtn.type = 'button';
     resetBtn.title = L.btnResetTitle;
 
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-light py-exercise-copy';
+    copyBtn.type = 'button';
+    copyBtn.textContent = StoreText.copyAnswer;
+    copyBtn.setAttribute('aria-label', StoreText.copyAnswerLabel(label));
+    copyBtn.disabled = true;
+    copyBtn.onclick = async function () {
+      if (!editor) return;
+      await CTMCopy.text(editor.getValue(), {label: StoreText.copyAnswerLabel(label)});
+    };
+
     buttonBar.appendChild(checkBtn);
     buttonBar.appendChild(resetBtn);
+    buttonBar.appendChild(copyBtn);
     container.appendChild(buttonBar);
 
     var resultArea = document.createElement('div');
@@ -376,6 +388,7 @@
 
       // Store reference so downloadAll() can read the current code later
       exerciseEditors[label] = editor;
+      copyBtn.disabled = false;
 
       if (submissionConfig.feedback) {
         feedbackAdapter = window.PyExerciseFeedback.attach({
