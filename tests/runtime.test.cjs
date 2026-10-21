@@ -474,3 +474,20 @@ test('Monaco loader and AMD base use the actual shared resolver on nested CDN/lo
     dom.window.close();
   }
 });
+
+test('local editor and Python failures name the course server, not a CDN', async () => {
+  const editor=page(exercises().slice(0,1),{monaco:false,assetMode:'local'});
+  editor.w.qpyodideInstance=Promise.resolve(fakeInterpreter());editor.w.eval(source);
+  await until(()=>editor.w.document.querySelector('.py-exercise-error'));
+  const editorText=editor.w.document.querySelector('.py-exercise-error').textContent;
+  assert.match(editorText,/server/);assert.doesNotMatch(editorText,/cdn\.jsdelivr\.net/);
+  editor.dom.window.close();
+  const python=page(exercises().slice(0,1),{assetMode:'local'});
+  python.w.loadPyodide=async()=>{throw new Error('Failed to load: https://course.test/_ctm-assets/pyodide/pyodide.js');};
+  python.w.eval(source);await until(()=>python.w.document.querySelector('.py-exercise-check'));
+  await tick(20);python.w.document.querySelector('.py-exercise-check').click();
+  await until(()=>python.w.document.querySelector('.py-exercise-result .py-exercise-error'));
+  const pythonText=python.w.document.querySelector('.py-exercise-result').textContent;
+  assert.match(pythonText,/server/);assert.doesNotMatch(pythonText,/cdn\.jsdelivr\.net/);
+  python.dom.window.close();
+});

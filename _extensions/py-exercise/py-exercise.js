@@ -63,6 +63,10 @@
   var L = CTMLocales.table('py-exercise', submissionConfig.lang);
   var StoreText = CTMLocales.table('ui', submissionConfig.lang);
 
+  function assetMessage(name) {
+    return L[name + (globalThis.CTM_ASSETS && globalThis.CTM_ASSETS.mode === 'local' ? 'Local' : '')];
+  }
+
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
   var exerciseResults = {};
 
@@ -587,7 +591,7 @@
         resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
           : runtimeUnavailable(err)
-          ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
+          ? '<div class="py-exercise-error">' + escapeHtml(assetMessage('pythonUnavailable')) + '</div>'
           : '<div class="py-exercise-error">' +
             '<strong>' + L.unexpectedError + '</strong>' +
             '<pre>' + escapeHtml(String(err)) + '</pre>' +
@@ -759,7 +763,7 @@
       if (msgEl) {
         msgEl.innerHTML =
           '<div class="py-submission-error">' +
-          (runtimeUnavailable(err) ? escapeHtml(L.pythonUnavailable) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
+          (runtimeUnavailable(err) ? escapeHtml(assetMessage('pythonUnavailable')) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
           '</div>';
       }
     }
@@ -882,7 +886,7 @@
         if (!container) return;
         var message = document.createElement('div');
         message.className = 'py-exercise-error';
-        message.textContent = L.editorUnavailable;
+        message.textContent = assetMessage('editorUnavailable');
         container.replaceChildren(message);
       });
       // On a slow connection the editor may still arrive; it then replaces the messages.
