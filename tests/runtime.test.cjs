@@ -499,7 +499,7 @@ test('forget preserves a current check assessment and feedback adapter state', a
   assert.equal(result(w, 1), output);
   assert.equal(editors[0].getValue(), exercises()[0].starter);
   assert.equal(invalidations, before);
-  assert.equal(resets, 0);
+  assert.equal(resets, beforeResets);
   assert.equal(py.runs, 1);
   dom.window.close();
 });
