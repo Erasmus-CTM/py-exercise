@@ -1,0 +1,55 @@
+name: Python exercise asset guards
+
+on:
+  pull_request:
+  push:
+    branches: [consolidation/2026-10-step5-assets]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Source-reviewed assets input for bounded tests, not the final canonical union.
+  ASSETS_LIB_REF: d0a3752b969acbf4cbd18df060a994721733f507
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          repository: Erasmus-CTM/ctm-libs
+          ref: ${{ env.ASSETS_LIB_REF }}
+          path: _assets-libs-source
+          persist-credentials: false
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.8.27'
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Verify the bounded library input
+        run: |
+          test "$(git -C _assets-libs-source rev-parse HEAD)" = "$ASSETS_LIB_REF"
+          echo "CTM_LIBS_EXTENSION=$GITHUB_WORKSPACE/_assets-libs-source/_extensions/ctm-libs" >> "$GITHUB_ENV"
+          echo "CTM_COMPONENT_DEV=1" >> "$GITHUB_ENV"
+      - run: python -m pip install jupyter nbformat
+      - run: npm ci --ignore-scripts
+      - name: Real Quarto guards, parsed fragments and existing runtime cases
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee assets-guards.log
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: py-exercise-assets-guards
+          path: assets-guards.log
+          if-no-files-found: warn
