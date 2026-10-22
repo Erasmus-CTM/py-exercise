@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 env:
-  # Source-reviewed assets input for bounded tests, not the final canonical union.
-  ASSETS_LIB_REF: d0a3752b969acbf4cbd18df060a994721733f507
+  # Source-reviewed combined store/assets input; final integration gates remain separate.
+  ASSETS_LIB_REF: 41b2be0a94a5bbf9dd8389fa83458d23692f2b4a
 
 jobs:
   guards:
