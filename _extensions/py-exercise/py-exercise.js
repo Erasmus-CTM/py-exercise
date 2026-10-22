@@ -421,8 +421,12 @@
         try { editor.setValue(code); } finally { writingEditor = false; }
         editRevision++;
       }
-      function clearCode() {
+      function forgetSaved() {
         if (savedOffer) { savedOffer.remove(); savedOffer = null; }
+        container.querySelectorAll('.py-exercise-saved-result').forEach(function (node) { node.remove(); });
+      }
+      function clearCode() {
+        forgetSaved();
         clearFeedback();
         feedbackAdapter?.reset();
         setCode(starterCode);
@@ -440,6 +444,7 @@
             delete exerciseResults[label];
             resultArea.innerHTML = '';
           },
+          forget: forgetSaved,
           clear: clearCode,
           legacy: [legacyCode(exerciseData.storeId || label, starterCode)],
           exportItem: function () {
