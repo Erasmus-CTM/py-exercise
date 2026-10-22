@@ -445,3 +445,78 @@ test('Copy answer is available with saving off and copies current code without r
   assert.equal(py.runs, 0);
   dom.window.close();
 });
+
+test('forget discards saved offers and gray results without changing live editor or output', async () => {
+  for (const state of ['restored', 'changed', 'withdrawn']) {
+    const {w, dom, editors} = page(exercises().slice(0, 1));
+    const py = fakeInterpreter();
+    w.qpyodideInstance = Promise.resolve(py);
+    const calls = observeStore(w, {state, outdated: state !== 'restored',
+      record: {inputs: {code: 'saved answer'}, result: {at: '2026-10-20', status: 'partial', score: .5}}});
+    w.eval(source);
+    await until(() => editors.length === 1 && calls.options);
+    const liveCode = editors[0].getValue();
+    const output = w.document.createElement('pre'); output.textContent = 'keep current output';
+    w.document.querySelector('.py-exercise-result').append(output);
+    const sibling = w.document.createElement('div');
+    sibling.className = 'py-exercise-saved-result'; sibling.textContent = 'another exercise history';
+    w.document.body.append(sibling);
+    assert.ok(w.document.querySelector('#py-exercise-1 .py-exercise-saved-result'));
+    calls.options.forget(); calls.options.forget();
+    assert.equal(editors[0].getValue(), liveCode);
+    assert.equal(output.isConnected, true);
+    assert.equal(output.textContent, 'keep current output');
+    assert.equal(w.document.querySelector('.py-exercise-saved-outdated'), null);
+    assert.equal(w.document.querySelector('#py-exercise-1 .py-exercise-saved-result'), null);
+    assert.equal(sibling.textContent, 'another exercise history');
+    assert.equal(sibling.isConnected, true);
+    assert.equal(calls.changes, 0);
+    assert.deepEqual(calls.results, []);
+    assert.equal(py.runs, 0);
+    dom.window.close();
+  }
+});
+
+test('forget preserves a current check assessment and feedback adapter state', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const calls = observeStore(w);
+  let adapterOptions, resets = 0, invalidations = 0;
+  w.__pyExerciseConfig.feedback = true;
+  w.PyExerciseFeedback = {attach(options) {
+    adapterOptions = options;
+    return {reset() {resets++;}, invalidate() {invalidations++;}};
+  }};
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options && adapterOptions);
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => /passed/.test(result(w, 1)));
+  const assessment = adapterOptions.getAssessment(), output = result(w, 1), before = invalidations, beforeResets = resets;
+  assert.ok(assessment);
+  calls.options.forget();
+  assert.equal(adapterOptions.getAssessment(), assessment);
+  assert.equal(result(w, 1), output);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(invalidations, before);
+  assert.equal(resets, 0);
+  assert.equal(py.runs, 1);
+  dom.window.close();
+});
+
+test('explicit Reset removes old offers and saved results without saving the starter', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const calls = observeStore(w, {state: 'changed', outdated: true,
+    record: {inputs: {code: 'old answer'}, result: {at: '2026-10-20', status: 'wrong', score: 0}}});
+  w.qpyodideInstance = Promise.resolve(fakeInterpreter());
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.ok(w.document.querySelector('.py-exercise-saved-outdated'));
+  w.document.querySelector('.py-exercise-reset').click();
+  assert.equal(w.document.querySelector('.py-exercise-saved-outdated'), null);
+  assert.equal(w.document.querySelector('.py-exercise-saved-result'), null);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(calls.changes, 0);
+  assert.equal(result(w, 1), '');
+  dom.window.close();
+});
