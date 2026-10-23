@@ -16,6 +16,10 @@ local function requireAssets()
   if type(assets) ~= "table" or type(assets.use) ~= "function" or type(assets.mode) ~= "function" then
     ctm.fail("py-exercise needs the shared assets API. Update CTM Assessment: " .. INSTALL)
   end
+  local layout = ctm.layout
+  if type(layout) ~= "table" or type(layout.use) ~= "function" then
+    ctm.fail("py-exercise needs the shared layout API. Update CTM Assessment: " .. INSTALL)
+  end
 end
 ----
 -- py-exercise.lua
@@ -182,6 +186,7 @@ local function ensureExerciseSetup()
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. scriptJson(config) .. ";</script>")
 
+  ctm.layout.use()
   ctm.assets.use()
   ctm.runtime.use()
   ctm.locale.use("py-exercise")
