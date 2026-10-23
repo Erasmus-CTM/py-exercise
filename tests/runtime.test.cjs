@@ -11,7 +11,7 @@ const { LOCALE, RUNTIME, sources } = require('./helpers/ctm-libs.cjs');
 
 // As the page loads them: ctm-libs' runtime and catalogue, then the exercise script.
 const componentSource = fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise/py-exercise.js'), 'utf8');
-const sharedSource = sources(['assets.js', ...RUNTIME, ...LOCALE, 'locales/ui.js']).join('\n');
+const sharedSource = sources(['assets.js', 'ui/ctm-layout.js', ...RUNTIME, ...LOCALE, 'locales/ui.js']).join('\n');
 const source = sharedSource + '\n' + componentSource;
 const assetTable = JSON.parse(fs.readFileSync(path.join(require('./helpers/ctm-libs.cjs').ctmLibs, 'assets.json'), 'utf8'));
 const runtimeURL = sources(RUNTIME)[0].match(/var indexURL = '([^']+)'/)[1];

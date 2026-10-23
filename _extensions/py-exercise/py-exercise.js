@@ -382,7 +382,7 @@
         value: starterCode,
         language: 'python',
         theme: 'vs',
-        automaticLayout: true,
+        automaticLayout: false,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
         fontSize: 14,
@@ -406,13 +406,7 @@
         });
       }
 
-      var updateHeight = function () {
-        var h = Math.max(80, editor.getContentHeight());
-        editorContainer.style.height = h + 'px';
-        editor.layout();
-      };
-      editor.onDidContentSizeChange(updateHeight);
-      updateHeight();
+      window.CTMLayout.fitEditor(editor, editorContainer, {minHeight: 80});
 
       // Monaco fires a change for setValue too. Restore and reset must not
       // create a fresh save or make an in-flight check current again.
