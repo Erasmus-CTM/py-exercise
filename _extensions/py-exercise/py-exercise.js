@@ -379,6 +379,16 @@
     }
     var editorReadyResolve, editorReadyReject;
     var editorReady = new Promise(function (resolve, reject) { editorReadyResolve = resolve; editorReadyReject = reject; });
+    function editorFailed(error) {
+      var message = document.createElement('div');
+      message.className = 'py-exercise-error';
+      message.textContent = assetMessage('editorUnavailable');
+      editorContainer.replaceChildren(message);
+      checkBtn.disabled = true;
+      resetBtn.disabled = true;
+      copyBtn.disabled = true;
+      editorReadyReject(error);
+    }
     require(['vs/editor/editor.main'], function () {
       try {
       editor = monaco.editor.create(editorContainer, {
@@ -498,8 +508,8 @@
       editor.onDidFocusEditorText(bindCheckKey);
       bindCheckKey();
       editorReadyResolve();
-      } catch (error) { editorReadyReject(error); }
-    }, editorReadyReject);
+      } catch (error) { editorFailed(error); }
+    }, editorFailed);
 
     var running = false;
     async function runCheck() {
@@ -868,7 +878,8 @@
   // Init
   // ---------------------------------------------------------------------------
   var initialUI = new Promise(function (resolve) {
-    document.addEventListener('DOMContentLoaded', resolve, {once: true});
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', resolve, {once: true});
+    else resolve();
   }).then(async function () {
     // Editors appear as soon as Monaco is ready; Python loads in the
     // background and the first Check waits for it (and reports a failure).
