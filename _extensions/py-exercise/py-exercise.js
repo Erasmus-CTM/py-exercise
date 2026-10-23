@@ -377,7 +377,10 @@
       assessment = null;
       if (feedbackAdapter) feedbackAdapter.invalidate();
     }
+    var editorReadyResolve, editorReadyReject;
+    var editorReady = new Promise(function (resolve, reject) { editorReadyResolve = resolve; editorReadyReject = reject; });
     require(['vs/editor/editor.main'], function () {
+      try {
       editor = monaco.editor.create(editorContainer, {
         value: starterCode,
         language: 'python',
@@ -494,7 +497,9 @@
       var bindCheckKey = function () { editor.addCommand(monaco.KeyMod.Shift | monaco.KeyCode.Enter, runCheck, keyContext); };
       editor.onDidFocusEditorText(bindCheckKey);
       bindCheckKey();
-    });
+      editorReadyResolve();
+      } catch (error) { editorReadyReject(error); }
+    }, editorReadyReject);
 
     var running = false;
     async function runCheck() {
@@ -618,6 +623,7 @@
         resultArea.innerHTML = '';
       }
     };
+    return editorReady;
   }
 
   // ---------------------------------------------------------------------------
@@ -861,20 +867,22 @@
   // ---------------------------------------------------------------------------
   // Init
   // ---------------------------------------------------------------------------
-  document.addEventListener('DOMContentLoaded', async function () {
+  var initialUI = new Promise(function (resolve) {
+    document.addEventListener('DOMContentLoaded', resolve, {once: true});
+  }).then(async function () {
     // Editors appear as soon as Monaco is ready; Python loads in the
     // background and the first Check waits for it (and reports a failure).
     ensurePyodide().catch(function (error) {
       console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
     });
     var monaco = ensureMonaco();
-    var ready = false;
+    var ready = null;
     function setUpExercises() {
-      if (ready) return;
-      ready = true;
-      (window.__pyExercises || []).forEach(setupExercise);
+      if (ready) return ready;
+      ready = Promise.all((window.__pyExercises || []).map(setupExercise));
       initSubmission();
       initDownload();
+      return ready;
     }
     try {
       await withTimeout(monaco, 60000, 'Timed out loading the Monaco editor');
@@ -889,10 +897,13 @@
         container.replaceChildren(message);
       });
       // On a slow connection the editor may still arrive; it then replaces the messages.
-      monaco.then(setUpExercises, function () {});
-      return;
+      monaco.then(setUpExercises, function () {}).catch(function (lateError) {
+        console.error('py-exercise: late editor initialization failed:', lateError);
+      });
+      throw error;
     }
-    setUpExercises();
+    await setUpExercises();
   });
+  globalThis.MathExerciseRuntime.trackInitialUI(initialUI);
 
 })();
