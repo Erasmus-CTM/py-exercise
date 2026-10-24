@@ -10,8 +10,11 @@ const { JSDOM } = require('jsdom');
 const { LOCALE, RUNTIME, sources } = require('./helpers/ctm-libs.cjs');
 
 // As the page loads them: ctm-libs' runtime and catalogue, then the exercise script.
-const source = [...sources([...RUNTIME, ...LOCALE, 'locales/ui.js']),
-  fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise/py-exercise.js'), 'utf8')].join('\n');
+const componentSource = fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise/py-exercise.js'), 'utf8');
+const sharedSource = sources(['assets.js', 'ui/ctm-layout.js', ...RUNTIME, ...LOCALE, 'locales/ui.js']).join('\n');
+const source = sharedSource + '\n' + componentSource;
+const assetTable = JSON.parse(fs.readFileSync(path.join(require('./helpers/ctm-libs.cjs').ctmLibs, 'assets.json'), 'utf8'));
+const runtimeURL = sources(RUNTIME)[0].match(/var indexURL = '([^']+)'/)[1];
 const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
 // One namespace shared by all exercises, like Pyodide's globals; the private
@@ -42,14 +45,19 @@ function fakeInterpreter() {
   return self;
 }
 
-function page(exercises, { monaco = true, monacoDelay = 0 } = {}) {
+function page(exercises, { monaco = true, monacoDelay = 0, assetMode = 'cdn', pageURL = 'https://example.org/p.html' } = {}) {
   const cells = exercises.map(e => '<div class="py-exercise-cell" id="py-exercise-' + e.id + '"></div>').join('');
-  const dom = new JSDOM('<!doctype html><html><head></head><body>' + cells + '</body></html>', { url: 'https://example.org/p.html', runScripts: 'outside-only' });
+  const dom = new JSDOM('<!doctype html><html><head></head><body>' + cells + '</body></html>', { url: pageURL, runScripts: 'outside-only' });
   const w = dom.window;
+  w.CTM_ASSETS = {v: 1, mode: assetMode, bases: Object.fromEntries(Object.entries(assetTable.assets).map(([name,entry]) =>
+    [name, assetMode === 'local' ? '../_ctm-assets/' + entry.local.replaceAll('{version}',entry.version) :
+      entry.cdn.replaceAll('{version}',entry.version)]))};
+  w.CTM_ASSETS.bases.pyodide = assetMode === 'local' ?
+    '../_ctm-assets/pyodide/' + runtimeURL.match(/\/v([^/]+)\/full\//)[1] + '/' : runtimeURL;
   w.__pyExerciseConfig = { submission: false, lang: 'en' };
   w.__pyExercises = exercises;
   w.require = (deps, ok, fail) => setTimeout(() => (monaco ? ok() : fail(new Error('offline'))), monacoDelay);
-  w.require.config = () => {};
+  w.require.config = config => { w.monacoVsPath = config.paths.vs; };
   // Monaco's addCommand is a global keybinding: the last registration wins.
   const keys = {}, editors = [];
   w.monaco = { KeyMod: { Shift: 1 }, KeyCode: { Enter: 2 }, editor: { create: (el, options) => {
@@ -519,4 +527,42 @@ test('explicit Reset removes old offers and saved results without saving the sta
   assert.equal(calls.changes, 0);
   assert.equal(result(w, 1), '');
   dom.window.close();
+});
+
+test('Monaco loader and AMD base use the actual shared resolver on nested CDN/local pages', async () => {
+  for (const assetMode of ['cdn', 'local']) {
+    const {w,dom,editors}=page(exercises().slice(0,1),{assetMode,pageURL:'https://example.org/course/unit/p.html'});
+    const amd=w.require; delete w.require;
+    w.qpyodideInstance=Promise.resolve(fakeInterpreter());
+    w.eval(sharedSource);
+    const loaded=[];
+    w.MathExerciseRuntime.loadScript=async url=>{loaded.push(url);w.require=amd;};
+    w.eval(componentSource);
+    await until(()=>editors.length===1);
+    const entry=assetTable.assets['monaco-editor'];
+    const base=assetMode==='local' ? 'https://example.org/course/_ctm-assets/'+entry.local.replaceAll('{version}',entry.version) :
+      entry.cdn.replaceAll('{version}',entry.version);
+    assert.deepEqual(loaded,[base+'min/vs/loader.js']);
+    assert.equal(w.monacoVsPath,base+'min/vs');
+    assert.ok(/^https:\/\//.test(w.monacoVsPath),'AMD base is absolute');
+    if(assetMode==='local')assert.equal(new URL(w.monacoVsPath).origin,w.location.origin);
+    dom.window.close();
+  }
+});
+
+test('local editor and Python failures name the course server, not a CDN', async () => {
+  const editor=page(exercises().slice(0,1),{monaco:false,assetMode:'local'});
+  editor.w.qpyodideInstance=Promise.resolve(fakeInterpreter());editor.w.eval(source);
+  await until(()=>editor.w.document.querySelector('.py-exercise-error'));
+  const editorText=editor.w.document.querySelector('.py-exercise-error').textContent;
+  assert.match(editorText,/server/);assert.doesNotMatch(editorText,/cdn\.jsdelivr\.net/);
+  editor.dom.window.close();
+  const python=page(exercises().slice(0,1),{assetMode:'local'});
+  python.w.loadPyodide=async()=>{throw new Error('Failed to load: https://course.test/_ctm-assets/pyodide/pyodide.js');};
+  python.w.eval(source);await until(()=>python.w.document.querySelector('.py-exercise-check'));
+  await tick(20);python.w.document.querySelector('.py-exercise-check').click();
+  await until(()=>python.w.document.querySelector('.py-exercise-result .py-exercise-error'));
+  const pythonText=python.w.document.querySelector('.py-exercise-result').textContent;
+  assert.match(pythonText,/server/);assert.doesNotMatch(pythonText,/cdn\.jsdelivr\.net/);
+  python.dom.window.close();
 });

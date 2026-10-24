@@ -26,13 +26,13 @@
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
-  // use), we load the AMD loader from CDN and let it fetch the editor itself.
+  // use), the shared resolver supplies the same pinned package in both modes.
   async function ensureMonaco() {
-    var cdnBase = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.46/min/vs';
+    var assetBase = CTMAssets.url('monaco-editor', 'min/vs');
     if (typeof require === 'undefined') {
-      await loadScript(cdnBase + '/loader.js');
+      await loadScript(assetBase + '/loader.js');
     }
-    require.config({ paths: { vs: cdnBase } });
+    require.config({ paths: { vs: assetBase } });
     await new Promise(function (resolve, reject) {
       require(['vs/editor/editor.main'], function () { resolve(); }, reject);
     });
@@ -62,6 +62,10 @@
   // compiled for the page's language (an unknown language gives English).
   var L = CTMLocales.table('py-exercise', submissionConfig.lang);
   var StoreText = CTMLocales.table('ui', submissionConfig.lang);
+
+  function assetMessage(name) {
+    return L[name + (globalThis.CTM_ASSETS && globalThis.CTM_ASSETS.mode === 'local' ? 'Local' : '')];
+  }
 
   // Map of exercise label → { label, passed, total, tests: [bool, ...] }
   var exerciseResults = {};
@@ -378,7 +382,7 @@
         value: starterCode,
         language: 'python',
         theme: 'vs',
-        automaticLayout: true,
+        automaticLayout: false,
         scrollBeyondLastLine: false,
         minimap: { enabled: false },
         fontSize: 14,
@@ -402,13 +406,7 @@
         });
       }
 
-      var updateHeight = function () {
-        var h = Math.max(80, editor.getContentHeight());
-        editorContainer.style.height = h + 'px';
-        editor.layout();
-      };
-      editor.onDidContentSizeChange(updateHeight);
-      updateHeight();
+      window.CTMLayout.fitEditor(editor, editorContainer, {minHeight: 80});
 
       // Monaco fires a change for setValue too. Restore and reset must not
       // create a fresh save or make an in-flight check current again.
@@ -592,7 +590,7 @@
         resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
           : runtimeUnavailable(err)
-          ? '<div class="py-exercise-error">' + escapeHtml(L.pythonUnavailable) + '</div>'
+          ? '<div class="py-exercise-error">' + escapeHtml(assetMessage('pythonUnavailable')) + '</div>'
           : '<div class="py-exercise-error">' +
             '<strong>' + L.unexpectedError + '</strong>' +
             '<pre>' + escapeHtml(String(err)) + '</pre>' +
@@ -764,7 +762,7 @@
       if (msgEl) {
         msgEl.innerHTML =
           '<div class="py-submission-error">' +
-          (runtimeUnavailable(err) ? escapeHtml(L.pythonUnavailable) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
+          (runtimeUnavailable(err) ? escapeHtml(assetMessage('pythonUnavailable')) : escapeHtml(L.encodingError) + escapeHtml(String(err))) +
           '</div>';
       }
     }
@@ -887,7 +885,7 @@
         if (!container) return;
         var message = document.createElement('div');
         message.className = 'py-exercise-error';
-        message.textContent = L.editorUnavailable;
+        message.textContent = assetMessage('editorUnavailable');
         container.replaceChildren(message);
       });
       // On a slow connection the editor may still arrive; it then replaces the messages.

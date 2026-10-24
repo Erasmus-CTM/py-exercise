@@ -9,6 +9,18 @@ local ctm = dofile(quarto.utils.resolve_path("ctm-bootstrap.lua"))("py-exercise"
 local needFeedback = false
 -- Seconds after which a running check offers Stop (stop-after).
 local stopAfter = 20
+local INSTALL = "quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz"
+
+local function requireAssets()
+  local assets = ctm.assets
+  if type(assets) ~= "table" or type(assets.use) ~= "function" or type(assets.mode) ~= "function" then
+    ctm.fail("py-exercise needs the shared assets API. Update CTM Assessment: " .. INSTALL)
+  end
+  local layout = ctm.layout
+  if type(layout) ~= "table" or type(layout.use) ~= "function" then
+    ctm.fail("py-exercise needs the shared layout API. Update CTM Assessment: " .. INSTALL)
+  end
+end
 ----
 -- py-exercise.lua
 --
@@ -174,6 +186,8 @@ local function ensureExerciseSetup()
   quarto.doc.include_text("before-body",
     "<script>window.__pyExerciseConfig = " .. scriptJson(config) .. ";</script>")
 
+  ctm.layout.use()
+  ctm.assets.use()
   ctm.runtime.use()
   ctm.locale.use("py-exercise")
   local version = extensionVersion()
@@ -227,6 +241,16 @@ local function CodeBlock(el)
 
   local code, opts = parseBlockOptions(el.text)
   local starter, tests = splitCode(code)
+  -- The umbrella collector receives exactly the fragments this component runs.
+  -- It is initialized by the page hook, after this filter has been loaded.
+  local imports = rawget(_G, "__ctmAuthorImports")
+  if type(imports) == "table" and type(imports.add) == "function" then
+    local origin = "py-exercise:" .. (opts["label"] or divId)
+    imports.add({source = starter, packages = {}, origin = origin .. ":starter"})
+    imports.add({source = tests, packages = {}, origin = origin .. ":tests"})
+  elseif ctm.assets.mode() == "local" then
+    ctm.fail("py-exercise: local asset builds require the CTM Assessment author-import collector. Update CTM Assessment: " .. INSTALL)
+  end
   -- Asked for, feedback needs the task, also in a build without AI feedback
   -- (both builds fail alike).
   if feedbackWanted and (not opts["task"] or opts["task"] == "") then
@@ -300,6 +324,16 @@ local function CodeBlock(el)
 end
 
 return {
+  { Pandoc = function(doc)
+      if not quarto.doc.is_format("html") then return doc end
+      local exercises = false
+      doc.blocks:walk({CodeBlock = function(b)
+        if b.classes:includes("{py-exercise}") then exercises = true end
+      end})
+      -- Check before Meta/settings preflight can obscure the missing capability.
+      if exercises then requireAssets() end
+      return doc
+    end },
   { Meta = Meta },
   { Pandoc = function(doc)
       if not quarto.doc.is_format("html") then return doc end
