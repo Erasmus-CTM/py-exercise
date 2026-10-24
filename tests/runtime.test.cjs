@@ -10,7 +10,7 @@ const { JSDOM } = require('jsdom');
 const { LOCALE, RUNTIME, sources } = require('./helpers/ctm-libs.cjs');
 
 // As the page loads them: ctm-libs' runtime and catalogue, then the exercise script.
-const source = [...sources([...RUNTIME, ...LOCALE]),
+const source = [...sources([...RUNTIME, ...LOCALE, 'locales/ui.js']),
   fs.readFileSync(path.join(__dirname, '../_extensions/py-exercise/py-exercise.js'), 'utf8')].join('\n');
 const tick = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -53,9 +53,9 @@ function page(exercises, { monaco = true, monacoDelay = 0 } = {}) {
   // Monaco's addCommand is a global keybinding: the last registration wins.
   const keys = {}, editors = [];
   w.monaco = { KeyMod: { Shift: 1 }, KeyCode: { Enter: 2 }, editor: { create: (el, options) => {
-    let value = options.value, focus = () => {};
-    const editor = { getValue: () => value, setValue: v => { value = v; }, getContentHeight: () => 100, layout() {},
-      onDidContentSizeChange() {}, onDidChangeModelContent() {}, onDidFocusEditorText(fn) { focus = fn; },
+    let value = options.value, focus = () => {}, changed = () => {};
+    const editor = { getValue: () => value, setValue: v => { value = v; changed(); }, getContentHeight: () => 100, layout() {},
+      onDidContentSizeChange() {}, onDidChangeModelContent(fn) { changed = fn; }, onDidFocusEditorText(fn) { focus = fn; },
       addCommand(key, fn) { keys[key] = fn; }, focus: () => focus() };
     editors.push(editor);
     return editor;
@@ -292,5 +292,231 @@ test('an error on the same runtime is not repeated', async () => {
   w.document.querySelector('.py-exercise-check').click();
   await until(() => /Unexpected error/.test(result(w, 1)));
   assert.equal(calls, 1);
+  dom.window.close();
+});
+
+
+// Store doubles observe only the component boundary. Storage transactions,
+// debounce cancellation and privacy switches are tested in ctm-libs.
+function observeStore(w, restored) {
+  const calls = {changes: 0, clears: 0, results: [], options: null};
+  w.CTMStore = {
+    register(options) {
+      calls.options = options;
+      return {
+        restore() {
+          if (restored && restored.state === 'restored') options.write(restored.record.inputs, restored);
+          return restored || {state: 'empty'};
+        },
+        changed() { calls.changes++; },
+        clear() { calls.clears++; options.clear(); },
+        result(value) { calls.results.push(value); }
+      };
+    }
+  };
+  return calls;
+}
+
+test('store restore never checks Python or schedules a synthetic editor save; Reset removes the answer', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const calls = observeStore(w, {state: 'restored', record: {inputs: {code: 'saved code'}, result: {status: 'partial', score: .5}}});
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.equal(editors[0].getValue(), 'saved code');
+  assert.equal(py.runs, 0);
+  assert.equal(calls.changes, 0);
+  assert.match(result(w, 1), /partly correct\s*\(50\s*%\)/);
+  editors[0].setValue('edit before reset');
+  assert.equal(calls.changes, 1);
+  w.document.querySelector('.py-exercise-reset').click();
+  assert.equal(calls.clears, 1);
+  assert.equal(calls.changes, 1, 'reset setValue must not ask for another save');
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(calls.options.read(), null, 'starter removes the answer record');
+  assert.equal(result(w, 1), '');
+  dom.window.close();
+});
+
+test('changed source offers readonly saved code and never fills current inputs', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const calls = observeStore(w, {state: 'changed', outdated: true, record: {inputs: {code: 'old answer'}}});
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(w.document.querySelector('.py-exercise-saved-outdated pre').textContent, 'old answer');
+  assert.equal(calls.changes, 0);
+  assert.equal(w.document.querySelector('.py-exercise-saved-outdated button'), null);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(calls.changes, 0);
+  assert.equal(py.runs, 0);
+  dom.window.close();
+});
+
+test('a result from code edited while checking cannot replace current feedback or be saved', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const py = fakeInterpreter();
+  let complete;
+  py.loadPackagesFromImports = () => new Promise(resolve => { complete = resolve; });
+  w.qpyodideInstance = Promise.resolve(py);
+  const calls = observeStore(w);
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => complete);
+  editors[0].setValue('different code');
+  complete();
+  await until(() => !w.document.querySelector('.py-exercise-check').disabled);
+  assert.deepEqual(calls.results, []);
+  assert.equal(result(w, 1), '');
+  dom.window.close();
+});
+
+test('legacy pyex lookup gives current path priority, then html, and removes only found variants', async () => {
+  for (const pathname of ['/course/page.html', '/course/page', '/course/', '/course/index', '/course/index.html']) {
+    const {w, dom, editors} = page(exercises().slice(0, 1));
+    w.history.replaceState({}, '', pathname);
+    w.qpyodideInstance = Promise.resolve(fakeInterpreter());
+    const calls = observeStore(w);
+    const base = pathname.includes('index') || pathname.endsWith('/') ? '/course/index' : '/course/page';
+    const keys = [base + '.html', base, ...(base.endsWith('index') ? ['/course/'] : [])];
+    keys.forEach(p => w.localStorage.setItem('pyex|' + p + '|add', 'code:' + p));
+    w.localStorage.setItem('pyex|/other/page|add', 'other course');
+    w.eval(source);
+    await until(() => editors.length === 1 && calls.options);
+    const adapter = calls.options.legacy[0];
+    let found = adapter.read();
+    assert.equal(found.inputs.code, 'code:' + pathname);
+    w.localStorage.removeItem('pyex|' + pathname + '|add');
+    found = adapter.read();
+    const expected = keys.find(p => p !== pathname);
+    assert.equal(found.inputs.code, 'code:' + expected);
+    adapter.remove(found);
+    assert.equal(adapter.read(), null);
+    assert.equal(w.localStorage.getItem('pyex|/other/page|add'), 'other course');
+    dom.window.close();
+  }
+});
+
+
+test('a starter re-saved by an old cached page migrates as a deletion marker', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  w.qpyodideInstance = Promise.resolve(fakeInterpreter());
+  const calls = observeStore(w);
+  w.localStorage.setItem('pyex|/p.html|add', exercises()[0].starter);
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  const candidate = calls.options.legacy[0].read();
+  assert.equal(candidate.inputs, null);
+  assert.equal(w.localStorage.getItem('pyex|/p.html|add'), exercises()[0].starter, 'read alone must not delete');
+  calls.options.legacy[0].remove(candidate);
+  assert.equal(w.localStorage.getItem('pyex|/p.html|add'), null);
+  dom.window.close();
+});
+
+
+test('Copy answer is available with saving off and copies current code without running Python', async () => {
+  const data = exercises().slice(0, 1);
+  data[0].save = false;
+  const {w, dom, editors} = page(data);
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const copied = [];
+  w.CTMCopy = {text: async (text, options) => { copied.push({text, options}); return {method: 'clipboard'}; }};
+  const calls = observeStore(w);
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.equal(calls.options.save, false);
+  const button = w.document.querySelector('.py-exercise-copy');
+  assert.equal(button.disabled, false);
+  editors[0].setValue('print("my unsaved answer")');
+  button.click();
+  await until(() => copied.length === 1);
+  assert.equal(copied[0].text, 'print("my unsaved answer")');
+  assert.ok(copied[0].options.label.includes('add'));
+  assert.equal(py.runs, 0);
+  w.document.querySelector('.py-exercise-reset').click();
+  button.click();
+  await until(() => copied.length === 2);
+  assert.equal(copied[1].text, data[0].starter);
+  assert.equal(py.runs, 0);
+  dom.window.close();
+});
+
+test('forget discards saved offers and gray results without changing live editor or output', async () => {
+  for (const state of ['restored', 'changed', 'withdrawn']) {
+    const {w, dom, editors} = page(exercises().slice(0, 1));
+    const py = fakeInterpreter();
+    w.qpyodideInstance = Promise.resolve(py);
+    const calls = observeStore(w, {state, outdated: state !== 'restored',
+      record: {inputs: {code: 'saved answer'}, result: {at: '2026-10-20', status: 'partial', score: .5}}});
+    w.eval(source);
+    await until(() => editors.length === 1 && calls.options);
+    const liveCode = editors[0].getValue();
+    const output = w.document.createElement('pre'); output.textContent = 'keep current output';
+    w.document.querySelector('.py-exercise-result').append(output);
+    const sibling = w.document.createElement('div');
+    sibling.className = 'py-exercise-saved-result'; sibling.textContent = 'another exercise history';
+    w.document.body.append(sibling);
+    assert.ok(w.document.querySelector('#py-exercise-1 .py-exercise-saved-result'));
+    calls.options.forget(); calls.options.forget();
+    assert.equal(editors[0].getValue(), liveCode);
+    assert.equal(output.isConnected, true);
+    assert.equal(output.textContent, 'keep current output');
+    assert.equal(w.document.querySelector('.py-exercise-saved-outdated'), null);
+    assert.equal(w.document.querySelector('#py-exercise-1 .py-exercise-saved-result'), null);
+    assert.equal(sibling.textContent, 'another exercise history');
+    assert.equal(sibling.isConnected, true);
+    assert.equal(calls.changes, 0);
+    assert.deepEqual(calls.results, []);
+    assert.equal(py.runs, 0);
+    dom.window.close();
+  }
+});
+
+test('forget preserves a current check assessment and feedback adapter state', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const py = fakeInterpreter();
+  w.qpyodideInstance = Promise.resolve(py);
+  const calls = observeStore(w);
+  let adapterOptions, resets = 0, invalidations = 0;
+  w.__pyExerciseConfig.feedback = true;
+  w.PyExerciseFeedback = {attach(options) {
+    adapterOptions = options;
+    return {reset() {resets++;}, invalidate() {invalidations++;}};
+  }};
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options && adapterOptions);
+  w.document.querySelector('.py-exercise-check').click();
+  await until(() => /passed/.test(result(w, 1)));
+  const assessment = adapterOptions.getAssessment(), output = result(w, 1), before = invalidations, beforeResets = resets;
+  assert.ok(assessment);
+  calls.options.forget();
+  assert.equal(adapterOptions.getAssessment(), assessment);
+  assert.equal(result(w, 1), output);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(invalidations, before);
+  assert.equal(resets, beforeResets);
+  assert.equal(py.runs, 1);
+  dom.window.close();
+});
+
+test('explicit Reset removes old offers and saved results without saving the starter', async () => {
+  const {w, dom, editors} = page(exercises().slice(0, 1));
+  const calls = observeStore(w, {state: 'changed', outdated: true,
+    record: {inputs: {code: 'old answer'}, result: {at: '2026-10-20', status: 'wrong', score: 0}}});
+  w.qpyodideInstance = Promise.resolve(fakeInterpreter());
+  w.eval(source);
+  await until(() => editors.length === 1 && calls.options);
+  assert.ok(w.document.querySelector('.py-exercise-saved-outdated'));
+  w.document.querySelector('.py-exercise-reset').click();
+  assert.equal(w.document.querySelector('.py-exercise-saved-outdated'), null);
+  assert.equal(w.document.querySelector('.py-exercise-saved-result'), null);
+  assert.equal(editors[0].getValue(), exercises()[0].starter);
+  assert.equal(calls.changes, 0);
+  assert.equal(result(w, 1), '');
   dom.window.close();
 });

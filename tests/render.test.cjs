@@ -165,3 +165,54 @@ test('show-test-hints: false hides the hints also as a YAML boolean (it was igno
   const r = render('py-exercise:\n  show-test-hints: false\n', exercise.replace('#| task: Return two.\n', '#| task: Return two.\n#| show-test-hints: true\n'));
   assert.equal(hints(r.html), true);
 });
+
+
+test('store metadata uses authored labels, changes with exercise source and honors save false', { skip }, () => {
+  const labeled = exercise.replace('#| task:', '#| label: saved-task\n#| task:');
+  const first = render('', labeled);
+  assert.equal(first.status, 0, first.stderr);
+  assert.match(first.html, /data-ctm-id="saved-task"/);
+  assert.match(first.html, /data-ctm-save="true"/);
+  assert.match(first.html, /ctm-store-manifest/);
+  const hash = first.html.match(/data-ctm-source="([a-f0-9]{16})"/)[1];
+  const edited = render('', labeled.replace('return 0', 'return 1'));
+  assert.equal(edited.status, 0, edited.stderr);
+  assert.notEqual(edited.html.match(/data-ctm-source="([a-f0-9]{16})"/)[1], hash);
+  const disabled = render('', labeled.replace('#| label:', '#| save: false\n#| label:'));
+  assert.equal(disabled.status, 0, disabled.stderr);
+  assert.match(disabled.html, /data-ctm-save="false"/);
+});
+
+test('source revisions include effective grading restrictions but exclude page presentation settings', {skip}, () => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'py-exercise-source-rules-'));
+  try {
+    fs.cpSync(path.join(__dirname,'../_extensions/py-exercise'),path.join(dir,'_extensions/py-exercise'),{recursive:true});
+    install(dir);
+    const body='```{py-exercise}\n#| label: stable-rule-task\n#| task: Sort values.\n#| forbidden-imports: pathlib\n#| forbidden-keywords: eval\nvalues = sorted([2, 1])\n## TESTS ##\nassert values == [1, 2]\n```\n';
+    const pages={
+      base:'py-exercise:\n  forbidden-imports: []\n  forbidden-keywords: []\n',
+      imports:'py-exercise:\n  forbidden-imports: [os]\n  forbidden-keywords: []\n',
+      keywords:'py-exercise:\n  forbidden-imports: []\n  forbidden-keywords: [sorted]\n',
+      rulesA:'py-exercise:\n  forbidden-imports: [os, sys, os, pathlib]\n  forbidden-keywords: [sorted, exec, sorted, eval]\n',
+      rulesB:'py-exercise:\n  forbidden-imports: [sys, os]\n  forbidden-keywords: [exec, sorted]\n',
+      display:'lang: de\npy-exercise:\n  forbidden-imports: []\n  forbidden-keywords: []\n  show-test-hints: false\n  submission: true\n  submission-key: changed\n  stop-after: 7\n',
+      feedback:'py-exercise:\n  feedback: true\n  forbidden-imports: []\n  forbidden-keywords: []\n'
+    };
+    fs.writeFileSync(path.join(dir,'_quarto.yml'),'project:\n  type: default\n  render: ['+Object.keys(pages).map(name=>name+'.qmd').join(', ')+']\nfilters: [py-exercise]\nformat: html\n');
+    for(const [name,front] of Object.entries(pages)) fs.writeFileSync(path.join(dir,name+'.qmd'),'---\n'+front+'---\n\n'+body);
+    const result=spawnSync(quarto,['render'],{cwd:dir,env:renderEnv,encoding:'utf8',timeout:120000});
+    assert.equal(result.status,0,result.stderr);
+    const hashes=Object.fromEntries(Object.keys(pages).map(name=>{
+      const html=fs.readFileSync(path.join(dir,name+'.html'),'utf8');
+      assert.match(html,/class="py-exercise-cell"/,name+" renders the production exercise root");
+      const hash=html.match(/data-ctm-source="([a-f0-9]{16})"/)?.[1];
+      assert.ok(hash,name+' has a rendered source revision');
+      return [name,hash];
+    }));
+    assert.notEqual(hashes.imports,hashes.base,'global imports change the unchanged exercise revision');
+    assert.notEqual(hashes.keywords,hashes.base,'global keyword rules change the unchanged exercise revision');
+    assert.equal(hashes.rulesA,hashes.rulesB,'ordering and duplicate global/per-cell rules do not change grading');
+    assert.equal(hashes.display,hashes.base,'language, hints, submission and stop timing are not grading rules');
+    assert.equal(hashes.feedback,hashes.base,'feedback settings are not grading rules');
+  } finally {fs.rmSync(dir,{recursive:true,force:true});}
+});
