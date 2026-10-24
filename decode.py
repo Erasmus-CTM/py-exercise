@@ -6,8 +6,9 @@ def decode_submission(encoded: str, key: str = "py-exercise") -> dict:
     raw       = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(xored))
     return json.loads(raw.decode("utf-8"))
 
-key = input("Enter the quarto quiz key: ")
-enc_string = input("Enter the encoded submission string: ")
-data = decode_submission(enc_string, key=key)
+if __name__ == "__main__":
+    key = input("Enter the quarto quiz key: ")
+    enc_string = input("Enter the encoded submission string: ")
+    data = decode_submission(enc_string, key=key)
 
-print(json.dumps(data,indent=4))
+    print(json.dumps(data,indent=4))
