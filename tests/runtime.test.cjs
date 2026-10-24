@@ -45,7 +45,7 @@ function fakeInterpreter() {
   return self;
 }
 
-function page(exercises, { monaco = true, monacoDelay = 0, assetMode = 'cdn', pageURL = 'https://example.org/p.html' } = {}) {
+function page(exercises, { monaco = true, monacoDelay = 0, editorDelay = monacoDelay, assetMode = 'cdn', pageURL = 'https://example.org/p.html', editorError = null, secondRequireError = null } = {}) {
   const cells = exercises.map(e => '<div class="py-exercise-cell" id="py-exercise-' + e.id + '"></div>').join('');
   const dom = new JSDOM('<!doctype html><html><head></head><body>' + cells + '</body></html>', { url: pageURL, runScripts: 'outside-only' });
   const w = dom.window;
@@ -56,11 +56,16 @@ function page(exercises, { monaco = true, monacoDelay = 0, assetMode = 'cdn', pa
     '../_ctm-assets/pyodide/' + runtimeURL.match(/\/v([^/]+)\/full\//)[1] + '/' : runtimeURL;
   w.__pyExerciseConfig = { submission: false, lang: 'en' };
   w.__pyExercises = exercises;
-  w.require = (deps, ok, fail) => setTimeout(() => (monaco ? ok() : fail(new Error('offline'))), monacoDelay);
+  let requireCalls = 0;
+  w.require = (deps, ok, fail) => { const call=++requireCalls; return setTimeout(() => {
+    if(secondRequireError && call>1) fail(secondRequireError);
+    else if(monaco) ok(); else fail(new Error('offline'));
+  }, call > 1 ? editorDelay : monacoDelay); };
   w.require.config = config => { w.monacoVsPath = config.paths.vs; };
   // Monaco's addCommand is a global keybinding: the last registration wins.
   const keys = {}, editors = [];
   w.monaco = { KeyMod: { Shift: 1 }, KeyCode: { Enter: 2 }, editor: { create: (el, options) => {
+    if(editorError) throw editorError;
     let value = options.value, focus = () => {}, changed = () => {};
     const editor = { getValue: () => value, setValue: v => { value = v; changed(); }, getContentHeight: () => 100, layout() {},
       onDidContentSizeChange() {}, onDidChangeModelContent(fn) { changed = fn; }, onDidFocusEditorText(fn) { focus = fn; },
@@ -151,11 +156,11 @@ test('Shift+Enter checks the focused exercise, once while a check runs', async (
 });
 
 test('an editor that arrives after the 60 s limit still replaces the message', { timeout: 90000 }, async () => {
-  const { w, dom } = page(exercises().slice(0, 1), { monacoDelay: 61000 });
+  const { w, dom, editors } = page(exercises().slice(0, 1), { monacoDelay: 61000, editorDelay: 0 });
   w.qpyodideInstance = Promise.resolve(fakeInterpreter());
   w.eval(source);
   await until(() => w.document.querySelector('.py-exercise-error'), 62000);
-  await until(() => w.document.querySelector('.py-exercise-check'), 5000);
+  await until(() => editors.length === 1, 5000);
   assert.equal(w.document.querySelector('.py-exercise-error'), null);
   dom.window.close();
 });
@@ -565,4 +570,65 @@ test('local editor and Python failures name the course server, not a CDN', async
   const pythonText=python.w.document.querySelector('.py-exercise-result').textContent;
   assert.match(pythonText,/server/);assert.doesNotMatch(pythonText,/cdn\.jsdelivr\.net/);
   python.dom.window.close();
+});
+
+test('initial UI barrier waits for actual asynchronous editor construction without waiting for Python', async()=>{
+  const {w,dom,editors}=page(exercises(),{monacoDelay:30});
+  w.qpyodideInstance=new Promise(()=>{});
+  w.eval(source);
+  let ready=false;
+  const barrier=w.MathExerciseRuntime.whenInitialUIReady().then(()=>{ready=true;});
+  await tick(35); assert.equal(editors.length,0,'second AMD callbacks still pending'); assert.equal(ready,false);
+  await barrier; assert.equal(editors.length,2); assert.equal(ready,true);
+  assert.equal(w.document.querySelectorAll('.py-exercise-check').length,2); dom.window.close();
+});
+
+test('initial UI reports per-editor AMD, create and layout failures instead of waiting until deadline',async()=>{
+  for(const stage of ['amd','create','layout']) {
+    const error=new Error(stage+' failed');
+    const {w,dom}=page(exercises().slice(0,1),{editorError:stage==='create'?error:null,secondRequireError:stage==='amd'?error:null});
+    w.qpyodideInstance=new Promise(()=>{});
+    const errors=[];w.console.error=(...args)=>errors.push(args);
+    w.eval(source);
+    if(stage==='layout')w.CTMLayout.fitEditor=()=>{throw error;};
+    await assert.rejects(w.MathExerciseRuntime.whenInitialUIReady(),e=>e===error);
+    assert.match(w.document.querySelector('.py-exercise-error').textContent,/code editor could not be loaded/);
+    assert.equal(w.document.querySelector('.py-exercise-check').disabled,true);
+    assert.equal(w.document.querySelector('.py-exercise-reset').disabled,true);
+    assert.equal(errors.length,1);assert.equal(errors[0][1],error);dom.window.close();
+  }
+});
+
+test('a deferred script initializes after DOMContentLoaded without waiting for another event',async()=>{
+  const {w,dom,editors}=page(exercises());
+  await new Promise(resolve=>w.document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+  // Deferred dependencies can finish after DOMContentLoaded but still before load.
+  Object.defineProperty(w.document,'readyState',{configurable:true,get:()=> 'interactive'});
+  w.qpyodideInstance=Promise.resolve(fakeInterpreter());
+  w.eval(source);
+  await until(()=>editors.length===2);
+  assert.equal(w.document.querySelectorAll('.py-exercise-check').length,2);
+  dom.window.close();
+});
+
+test('a failed editor stays local while another exercise can Check without JSXGraph or speech',async()=>{
+  const {w,dom,editors}=page(exercises());
+  w.qpyodideInstance=Promise.resolve(fakeInterpreter());
+  const create=w.monaco.editor.create;
+  let first=true;
+  w.monaco.editor.create=(...args)=>{
+    if(first){first=false;throw new Error('first editor failed');}
+    return create(...args);
+  };
+  w.console.error=()=>{};
+  assert.equal(w.JXG,undefined);assert.equal(w.speechSynthesis,undefined);
+  w.eval(source);
+  await assert.rejects(w.MathExerciseRuntime.whenInitialUIReady(),/first editor failed/);
+  await until(()=>editors.length===1);
+  const buttons=w.document.querySelectorAll('.py-exercise-check');
+  assert.equal(buttons[0].disabled,true);assert.equal(buttons[1].disabled,false);
+  buttons[1].click();
+  await until(()=>/0 of 1/.test(result(w,2)));
+  assert.match(result(w,2),/0 of 1/);
+  dom.window.close();
 });
