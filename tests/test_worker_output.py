@@ -1,7 +1,28 @@
 import unittest
+import sys
+import types
+from unittest.mock import patch
 import test_example_checks as harness
 
 class WorkerOutput(unittest.TestCase):
+    def test_private_plot_does_not_publish_an_image_or_fail_an_authored_test(self):
+        module = harness.browser_module()
+        plt = types.ModuleType('matplotlib.pyplot')
+        plt.show = lambda: None
+        plt.switch_backend = lambda name: None
+        plt.get_fignums = lambda: [1]
+        plt.figure = lambda number: object()
+        plt.close = lambda *args: None
+        figure = types.ModuleType('matplotlib.figure')
+        figure.Figure = type('Figure', (), {'show':lambda self:None})
+        matplotlib = types.ModuleType('matplotlib')
+        matplotlib.pyplot = plt
+        matplotlib.figure = figure
+        with patch.dict(sys.modules, {'matplotlib':matplotlib,'matplotlib.pyplot':plt,'matplotlib.figure':figure}):
+            result = module.run('pass', 'import matplotlib.pyplot as plt\nplt.show()\nassert True', harness.MESSAGES)
+        self.assertEqual(result['tests'], [{'passed':True}] * 3)
+        self.assertNotIn('images', result)
+
     def test_stream_contains_learner_output_only(self):
         module = harness.browser_module()
         stream, phases = [], []

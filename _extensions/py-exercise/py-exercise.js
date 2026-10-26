@@ -181,7 +181,7 @@
     "    old_show, old_figure_show = plt.show, Figure.show",
     "    def show_figure(fig):",
     "        if not capture.streaming:",
-    "            raise RuntimeError(\"Authored tests cannot publish learner plots\")",
+    "            return  # private test plots must not change the verdict",
     "        if len(images) >= 16:",
     "            raise _CTMOutputLimit(\"Too many plots; no result was graded.\")",
     "        sink = _BoundedPNG()",
