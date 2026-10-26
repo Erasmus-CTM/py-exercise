@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Erasmus-CTM/ctm-libs
-          ref: ${{ steps.review.outputs['ctm-libs'] || '79f6b192d4f676edcb9fbcbc0d00307c61fdbaaa' }}
+          ref: ${{ steps.review.outputs['ctm-libs'] || 'f5b5bf9e2ddf0149fa11999b548bfaea5d5b7083' }}
           path: _ctm-libs-source
       - name: Install ctm-libs (a component build without the CTM Assessment package)
         run: |
