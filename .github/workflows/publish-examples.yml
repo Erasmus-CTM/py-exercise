@@ -12,7 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Select explicit review dependencies (main keeps normal defaults)
@@ -24,7 +24,7 @@ jobs:
         with:
           version: '1.8.27'
       - name: Fetch ctm-libs, the library of CTM Assessment
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
           ref: ${{ steps.review.outputs['ctm-libs'] || 'main' }}
@@ -41,7 +41,7 @@ jobs:
         run: python -m unittest discover -s tests
       - name: Build the standalone pages
         run: python scripts/build-example-site.py
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
   deploy:
@@ -56,4 +56,4 @@ jobs:
     steps:
       - name: Publish the examples
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
