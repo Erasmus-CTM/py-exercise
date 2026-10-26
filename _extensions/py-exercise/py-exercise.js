@@ -18,11 +18,11 @@
 
   // All exercises on a page share one Python namespace: each check's
   // set-globals/evaluate sequence runs as one transaction, in click order.
-  var pythonQueue = Promise.resolve();
-  function pythonTransaction(run) {
-    var result = pythonQueue.then(run);
-    pythonQueue = result.catch(function () {});
-    return result;
+  async function pythonTransaction(run, handlers) {
+    var runtime = globalThis.MathExerciseRuntime, epoch = runtime.stopCount();
+    var py = await ensurePyodide();
+    if (runtime.stopCount() !== epoch) throw new Error('Python operation was cancelled.');
+    return runtime.transaction(py, function () { return run(py); }, handlers);
   }
 
   // Monaco is normally already loaded by the pyodide extension. If not (standalone
@@ -83,93 +83,185 @@
   // ---------------------------------------------------------------------------
   var PY_MODULE = '_ctm_py_exercise';
   var MODULE_PY = [
-    'import ast as _ast, io as _io, json as _json, base64 as _b64, sys as _sys, traceback as _traceback',
-    'try:',
-    '    import _ctm_guard',
-    'except ImportError:  # native test runners',
-    '    _ctm_guard = None',
-    '',
-    '_KW_NODES = {',
-    '    "for": _ast.For, "while": _ast.While, "with": _ast.With, "lambda": _ast.Lambda,',
-    '    "class": _ast.ClassDef, "global": _ast.Global, "nonlocal": _ast.Nonlocal, "try": _ast.Try,',
-    '    "raise": _ast.Raise, "del": _ast.Delete, "assert": _ast.Assert, "yield": _ast.Yield,',
-    '}',
-    '',
-    'def violations(code, forbidden_imports, forbidden_keywords, messages):',
-    '    found = []',
-    '    def add(message):',
-    '        if message not in found:',
-    '            found.append(message)',
-    '    try:',
-    '        tree = _ast.parse(code)',
-    '    except SyntaxError:',
-    '        return found',
-    '    for node in _ast.walk(tree):',
-    '        if isinstance(node, _ast.Import):',
-    '            for alias in node.names:',
-    '                top = alias.name.split(".")[0]',
-    '                if top in forbidden_imports:',
-    '                    add(messages["forbidden_import"].format(top))',
-    '        elif isinstance(node, _ast.ImportFrom):',
-    '            if node.module:',
-    '                top = node.module.split(".")[0]',
-    '                if top in forbidden_imports:',
-    '                    add(messages["forbidden_import"].format(top))',
-    '        elif isinstance(node, _ast.Call):',
-    '            if isinstance(node.func, _ast.Name) and node.func.id in forbidden_keywords:',
-    '                add(messages["forbidden_function"].format(node.func.id))',
-    '            elif isinstance(node.func, _ast.Attribute) and node.func.attr in forbidden_keywords:',
-    '                add(messages["forbidden_method"].format(node.func.attr))',
-    '        else:',
-    '            for keyword, node_type in _KW_NODES.items():',
-    '                if keyword in forbidden_keywords and isinstance(node, node_type):',
-    '                    add(messages["forbidden_keyword"].format(keyword))',
-    '    return found',
-    '',
-    'def run(code, tests, messages):',
-    '    namespace = {}  # as before 0.3: __name__ is not "__main__", so main() blocks do not run',
-    '    results = {"student_error": None, "stdout": "", "tests": []}',
-    '    state = _ctm_guard.snapshot() if _ctm_guard else None',
-    '    buffer = _io.StringIO()',
-    '    stdout = _sys.stdout',
-    '    try:',
-    '        _sys.stdout = buffer',
-    '        try:',
-    '            exec(compile(code, "<student>", "exec"), namespace)',
-    '        except (Exception, SystemExit):',
-    '            results["student_error"] = _traceback.format_exc()',
-    '        results["stdout"] = buffer.getvalue()',
-    '        if results["student_error"] is None:',
-    '            try:',
-    '                tree = _ast.parse(tests)',
-    '            except SyntaxError as error:',
-    '                results["student_error"] = messages["syntax_error"].format(error)',
-    '                tree = None',
-    '            for statement in (tree.body if tree else []):',
-    '                single = compile(_ast.Module(body=[statement], type_ignores=[]), "<test>", "exec")',
-    '                try:',
-    '                    exec(single, namespace)',
-    '                    results["tests"].append({"passed": True})',
-    '                except AssertionError as error:',
-    '                    results["tests"].append({"passed": False, "message": str(error) if str(error) else messages["assertion_failed"]})',
-    '                except (Exception, SystemExit) as error:',
-    '                    results["tests"].append({"passed": False, "message": messages["test_error"].format(error)})',
-    '    finally:',
-    '        _sys.stdout = stdout',
-    '        if state is not None:',
-    '            _ctm_guard.restore(state)',
-    '    return results',
-    '',
-    'def encode(payload, key):',
-    '    key = key.encode("utf-8")',
-    '    raw = _json.dumps(payload, ensure_ascii=False).encode("utf-8")',
-    '    return _b64.b64encode(bytes(b ^ key[i % len(key)] for i, b in enumerate(raw))).decode("ascii")',
-    '',
-    'def call(caller):',
-    '    # The request arrives as one JSON string in the shared namespace; take it out.',
-    '    request = _json.loads(caller.pop("_ctm_py_request"))',
-    '    function = {"violations": violations, "run": run, "encode": encode}[request["function"]]',
-    '    return _json.dumps(function(*request["args"]))',
+    "import ast as _ast, io as _io, json as _json, base64 as _b64, sys as _sys, traceback as _traceback",
+    "try:",
+    "    import _ctm_guard",
+    "except ImportError:  # native test runners",
+    "    _ctm_guard = None",
+    "",
+    "_KW_NODES = {",
+    "    \"for\": _ast.For, \"while\": _ast.While, \"with\": _ast.With, \"lambda\": _ast.Lambda,",
+    "    \"class\": _ast.ClassDef, \"global\": _ast.Global, \"nonlocal\": _ast.Nonlocal, \"try\": _ast.Try,",
+    "    \"raise\": _ast.Raise, \"del\": _ast.Delete, \"assert\": _ast.Assert, \"yield\": _ast.Yield,",
+    "}",
+    "",
+    "def violations(code, forbidden_imports, forbidden_keywords, messages):",
+    "    found = []",
+    "    def add(message):",
+    "        if message not in found:",
+    "            found.append(message)",
+    "    try:",
+    "        tree = _ast.parse(code)",
+    "    except SyntaxError:",
+    "        return found",
+    "    for node in _ast.walk(tree):",
+    "        if isinstance(node, _ast.Import):",
+    "            for alias in node.names:",
+    "                top = alias.name.split(\".\")[0]",
+    "                if top in forbidden_imports:",
+    "                    add(messages[\"forbidden_import\"].format(top))",
+    "        elif isinstance(node, _ast.ImportFrom):",
+    "            if node.module:",
+    "                top = node.module.split(\".\")[0]",
+    "                if top in forbidden_imports:",
+    "                    add(messages[\"forbidden_import\"].format(top))",
+    "        elif isinstance(node, _ast.Call):",
+    "            if isinstance(node.func, _ast.Name) and node.func.id in forbidden_keywords:",
+    "                add(messages[\"forbidden_function\"].format(node.func.id))",
+    "            elif isinstance(node.func, _ast.Attribute) and node.func.attr in forbidden_keywords:",
+    "                add(messages[\"forbidden_method\"].format(node.func.attr))",
+    "        else:",
+    "            for keyword, node_type in _KW_NODES.items():",
+    "                if keyword in forbidden_keywords and isinstance(node, node_type):",
+    "                    add(messages[\"forbidden_keyword\"].format(keyword))",
+    "    return found",
+    "",
+    "try:",
+    "    import js as _worker_js",
+    "except ImportError:",
+    "    _worker_js = None",
+    "_phase_callback = getattr(_worker_js, \"_ctm_set_execution_phase\", None)",
+    "_stream_callback = getattr(_worker_js, \"_ctm_emit_learner\", None)",
+    "",
+    "def _worker_phase(phase):",
+    "    if _phase_callback is not None:",
+    "        _phase_callback(phase)",
+    "",
+    "def _learner_stream(text):",
+    "    if _stream_callback is not None:",
+    "        _stream_callback(text)",
+    "",
+    "class _CTMOutputLimit(BaseException):",
+    "    pass",
+    "",
+    "class _BoundedOutput(_io.StringIO):",
+    "    def __init__(self):",
+    "        super().__init__()",
+    "        self._size = 0",
+    "        self.streaming = True",
+    "    def write(self, text, _len=len):",
+    "        size = _len(text.encode(\"utf-8\"))",
+    "        if self._size + size > 262144:",
+    "            raise _CTMOutputLimit(\"Python output exceeded its capture budget; no result was graded.\")",
+    "        self._size += size",
+    "        if self.streaming:",
+    "            _learner_stream(text)",
+    "        return super().write(text)",
+    "",
+    "class _BoundedPNG(_io.BytesIO):",
+    "    def write(self, data):",
+    "        if self.tell() + len(data) > 8388608:",
+    "            raise _CTMOutputLimit(\"Plot exceeds its encoding budget; no result was graded.\")",
+    "        return super().write(data)",
+    "",
+    "def _plots_begin(images, code):",
+    "    plt = _sys.modules.get(\"matplotlib.pyplot\")",
+    "    if plt is None:",
+    "        try:",
+    "            imports = [node for node in _ast.walk(_ast.parse(code)) if isinstance(node, (_ast.Import, _ast.ImportFrom))]",
+    "        except SyntaxError:",
+    "            return lambda: None",
+    "        uses_plots = any((isinstance(node, _ast.ImportFrom) and (node.module or \"\").startswith(\"matplotlib\")) or",
+    "                         (isinstance(node, _ast.Import) and any(alias.name.startswith(\"matplotlib\") for alias in node.names)) for node in imports)",
+    "        if not uses_plots:",
+    "            return lambda: None",
+    "        from matplotlib import pyplot as plt",
+    "    plt.switch_backend(\"agg\")",
+    "    from matplotlib.figure import Figure",
+    "    old_show, old_figure_show = plt.show, Figure.show",
+    "    def show_figure(fig):",
+    "        if not capture.streaming:",
+    "            raise RuntimeError(\"Authored tests cannot publish learner plots\")",
+    "        if len(images) >= 16:",
+    "            raise _CTMOutputLimit(\"Too many plots; no result was graded.\")",
+    "        sink = _BoundedPNG()",
+    "        fig.savefig(sink, format=\"png\", bbox_inches=\"tight\")",
+    "        encoded = _b64.b64encode(sink.getvalue()).decode(\"ascii\")",
+    "        if sum(map(len, images)) + len(encoded) > 16777216:",
+    "            raise _CTMOutputLimit(\"Plot output exceeds its budget; no result was graded.\")",
+    "        images.append(encoded)",
+    "        plt.close(fig)",
+    "    capture = None",
+    "    def begin(buffer):",
+    "        nonlocal capture",
+    "        capture = buffer",
+    "    def show(*args, **kwargs):",
+    "        for num in list(plt.get_fignums()):",
+    "            show_figure(plt.figure(num))",
+    "    plt.show = show",
+    "    Figure.show = lambda fig, *args, **kwargs: show_figure(fig)",
+    "    def restore():",
+    "        plt.close(\"all\")",
+    "        plt.show, Figure.show = old_show, old_figure_show",
+    "    restore.begin = begin",
+    "    return restore",
+    "",
+    "def run(code, tests, messages):",
+    "    namespace = {}  # as before 0.3: __name__ is not \"__main__\", so main() blocks do not run",
+    "    results = {\"student_error\": None, \"stdout\": \"\", \"tests\": []}",
+    "    state = _ctm_guard.snapshot() if _ctm_guard else None",
+    "    buffer = _BoundedOutput()",
+    "    stdout = _sys.stdout",
+    "    images = []",
+    "    restore_plots = lambda: None",
+    "    try:",
+    "        restore_plots = _plots_begin(images, code)",
+    "        if hasattr(restore_plots, \"begin\"):",
+    "            restore_plots.begin(buffer)",
+    "        _worker_phase(\"learner\")",
+    "        _sys.stdout = buffer",
+    "        try:",
+    "            exec(compile(code, \"<student>\", \"exec\"), namespace)",
+    "        except (Exception, SystemExit):",
+    "            results[\"student_error\"] = _traceback.format_exc()",
+    "        results[\"stdout\"] = buffer.getvalue()",
+    "        buffer.streaming = False",
+    "        _worker_phase(\"private\")",
+    "        if results[\"student_error\"] is None:",
+    "            try:",
+    "                tree = _ast.parse(tests)",
+    "            except SyntaxError as error:",
+    "                results[\"student_error\"] = messages[\"syntax_error\"].format(error)",
+    "                tree = None",
+    "            for statement in (tree.body if tree else []):",
+    "                single = compile(_ast.Module(body=[statement], type_ignores=[]), \"<test>\", \"exec\")",
+    "                try:",
+    "                    exec(single, namespace)",
+    "                    results[\"tests\"].append({\"passed\": True})",
+    "                except AssertionError as error:",
+    "                    results[\"tests\"].append({\"passed\": False, \"message\": str(error) if str(error) else messages[\"assertion_failed\"]})",
+    "                except (Exception, SystemExit) as error:",
+    "                    results[\"tests\"].append({\"passed\": False, \"message\": messages[\"test_error\"].format(error)})",
+    "    finally:",
+    "        _worker_phase(\"private\")",
+    "        restore_plots()",
+    "        _sys.stdout = stdout",
+    "        if state is not None:",
+    "            _ctm_guard.restore(state)",
+    "    if images:",
+    "        results[\"images\"] = images",
+    "    return results",
+    "",
+    "def encode(payload, key):",
+    "    key = key.encode(\"utf-8\")",
+    "    raw = _json.dumps(payload, ensure_ascii=False).encode(\"utf-8\")",
+    "    return _b64.b64encode(bytes(b ^ key[i % len(key)] for i, b in enumerate(raw))).decode(\"ascii\")",
+    "",
+    "def call(caller):",
+    "    # The request arrives as one JSON string in the shared namespace; take it out.",
+    "    request = _json.loads(caller.pop(\"_ctm_py_request\"))",
+    "    function = {\"violations\": violations, \"run\": run, \"encode\": encode}[request[\"function\"]]",
+    "    return _json.dumps(function(*request[\"args\"]))",
   ].join('\n');
   var CALL_PY = '__import__("' + PY_MODULE + '").call(globals())';
 
@@ -551,9 +643,31 @@
           });
         };
         var used = null;
+        var stream = null;
+        var handlers = {
+          onStream: function (text) {
+            if (checkedRevision !== editRevision) return;
+            if (!stream) { stream = document.createElement('pre'); stream.className = 'py-exercise-stream'; resultArea.appendChild(stream); }
+            stream.appendChild(document.createTextNode(text));
+          },
+          onInputRequired: function (prompt) {
+            var form = document.createElement('form'), input = document.createElement('input');
+            var label = document.createElement('label'), submit = document.createElement('button');
+            label.textContent = prompt; label.appendChild(input);
+            input.setAttribute('aria-label', prompt || L.inputLabel);
+            submit.type = 'submit'; submit.textContent = L.submitInput;
+            form.append(label, submit); resultArea.appendChild(form); input.focus();
+            form.onsubmit = function (event) {
+              event.preventDefault();
+              try { used.provideInput(input.value); form.remove(); }
+              catch (error) { input.setCustomValidity(L.inputTooLong); input.reportValidity(); }
+            };
+            input.oninput = function () { input.setCustomValidity(''); };
+          }
+        };
         var check = function () {
-          return pythonTransaction(async function () {
-            var py = used = await ensurePyodide();
+          return pythonTransaction(async function (py) {
+            used = py;
             if (forbiddenImports.length > 0 || forbiddenKeywords.length > 0) {
               var violations = await pythonCall(py, 'violations', [studentCode, forbiddenImports, forbiddenKeywords, messages()]);
               if (violations.length > 0) return { violations: violations };
@@ -561,7 +675,7 @@
             await py.loadPackagesFromImports(studentCode);
             startSlow();
             return { data: await pythonCall(py, 'run', [studentCode, testsCode, messages()]) };
-          });
+          }, handlers);
         };
         var outcome;
         try {
@@ -585,6 +699,10 @@
         var data = outcome.data;
         if (checkedRevision !== editRevision) return;
         renderResult(resultArea, data, label, showHints);
+        (data.images || []).forEach(function (image) {
+          var img = document.createElement('img'); img.src = 'data:image/png;base64,' + image;
+          img.alt = L.plotLabel; img.style.maxWidth = '100%'; resultArea.appendChild(img);
+        });
         if (storeHandle) {
           var total = (data.tests || []).length;
           var passed = (data.tests || []).filter(function (test) { return test.passed; }).length;
@@ -604,6 +722,8 @@
         // Stopped from this or any other component's Stop button.
         resultArea.innerHTML = stops !== null && runtime.stopCount() !== stops
           ? '<div class="py-exercise-error">' + escapeHtml(L.stopped) + '</div>'
+          : err && err.code === 'input-unavailable'
+          ? '<div class="py-exercise-error">' + escapeHtml(L.inputUnavailable) + '</div>'
           : runtimeUnavailable(err)
           ? '<div class="py-exercise-error">' + escapeHtml(assetMessage('pythonUnavailable')) + '</div>'
           : '<div class="py-exercise-error">' +
@@ -765,8 +885,7 @@
     };
 
     try {
-      var encoded = await pythonTransaction(async function () {
-        var py = await ensurePyodide();
+      var encoded = await pythonTransaction(async function (py) {
         return pythonCall(py, 'encode', [payload, submissionConfig.submissionKey || 'py-exercise']);
       });
 
