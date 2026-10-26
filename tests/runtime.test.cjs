@@ -57,7 +57,7 @@ function page(exercises, { monaco = true, monacoDelay = 0, editorDelay = monacoD
   w.__pyExerciseConfig = { submission: false, lang: 'en' };
   w.__pyExercises = exercises;
   let requireCalls = 0;
-  w.require = (deps, ok, fail) => { const call=++requireCalls; return setTimeout(() => {
+  w.require = (deps, ok, fail) => { if(typeof deps==='string')return {}; const call=++requireCalls; return setTimeout(() => {
     if(secondRequireError && call>1) fail(secondRequireError);
     else if(monaco) ok(); else fail(new Error('offline'));
   }, call > 1 ? editorDelay : monacoDelay); };

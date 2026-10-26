@@ -2,6 +2,8 @@
 
 ## 0.5.0 (CTM Assessment consolidation, phase B3)
 
+- Standalone editors use the shared WebKit clipboard capability guard before
+  construction, retaining normal copy fallbacks on plain HTTP exam hosting.
 - Code and checked results use ctm-libs' shared answer store. Saving settings,
   source changes, page/course deletion and unavailable storage follow the shared policy.
 - Existing pyex code is migrated lazily from HTML, extensionless and index URLs.

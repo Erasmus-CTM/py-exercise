@@ -485,6 +485,7 @@
     }
     require(['vs/editor/editor.main'], function () {
       try {
+      globalThis.MathExerciseRuntime.prepareMonacoClipboard();
       editor = monaco.editor.create(editorContainer, {
         value: starterCode,
         language: 'python',
