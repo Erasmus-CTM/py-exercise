@@ -6,7 +6,7 @@ jobs:
   example:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Select explicit review dependencies (main keeps normal defaults)
@@ -18,7 +18,7 @@ jobs:
         with:
           version: '1.8.27'
       - name: Fetch ctm-libs, the library of CTM Assessment
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: Erasmus-CTM/ctm-libs
           ref: ${{ steps.review.outputs['ctm-libs'] || '6f464e687e47282b3faebed27317c48dd8ad70ff' }}
@@ -33,9 +33,9 @@ jobs:
           echo "CTM_COMPONENT_DEV=1" >> "$GITHUB_ENV"
       - name: Test the published example requirements
         run: python -m unittest discover -s tests
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Test the browser runtime (jsdom)
         run: |
           npm ci --ignore-scripts
@@ -48,7 +48,7 @@ jobs:
           test -f example-en.html
           test -f example-mini.html
           test -f example.html || test -f _site/example.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: standalone-example
           path: |
