@@ -101,14 +101,20 @@ test('Norwegian pages get the Bokmål interface; ctm-assessment: lang and py-exe
 test('scripts and styles are cacheable dependencies: once per page, the adapter before the exercise script', { skip }, () => {
   const r = render('py-exercise:\n  feedback: true\n', exercise + '\n' + exercise.replace('answer', 'other'));
   assert.equal(r.status, 0, r.stderr);
-  const order = ['ctm-runtime-[\\d.]+/pyodide-runtime\\.js', 'ctm-locale-[\\d.]+/ctm-locale\\.js', 'ctm-locale-py-exercise-[\\d.]+/py-exercise\\.js',
-    'py-exercise-feedback-[\\d.]+/py-exercise-feedback\\.js', 'py-exercise-[\\d.]+/py-exercise\\.js'].map(file => {
+  // Shared layout registers the Settings catalogue before the runtime. Keep
+  // the complete dependency order strict, including one copy of every file.
+  const files = ['ctm-locale-[\\d.]+/ctm-locale\\.js', 'ctm-locale-[\\d.]+/common\\.js',
+    'ctm-locale-ui-[\\d.]+/ui\\.js', 'ctm-layout-[\\d.]+/ctm-layout\\.js',
+    'ctm-layout-[\\d.]+/ctm-settings\\.js', 'ctm-runtime-[\\d.]+/pyodide-runtime\\.js',
+    'ctm-locale-py-exercise-[\\d.]+/py-exercise\\.js',
+    'py-exercise-feedback-[\\d.]+/py-exercise-feedback\\.js', 'py-exercise-[\\d.]+/py-exercise\\.js'];
+  const order = files.map(file => {
     const found = [...r.html.matchAll(new RegExp('<script src="[^"]*/' + file + '"></script>', 'g'))];
     assert.equal(found.length, 1, file);
     return found[0].index;
   });
   assert.deepEqual([...order].sort((a, b) => a - b), order);
-  assert.ok(r.html.indexOf('window.__pyExerciseConfig = ') < order[3]);
+  assert.ok(r.html.indexOf('window.__pyExerciseConfig = ') < order[files.findIndex(file => file.startsWith('py-exercise-feedback-'))]);
   assert.equal((r.html.match(/<link href="[^"]*\/py-exercise-[\d.]+\/py-exercise\.css" rel="stylesheet">/g) || []).length, 1);
   assert.doesNotMatch(r.html, /MathExerciseRuntime = |var LOCALES|<style type="text\/css">/);
   assert.deepEqual(r.missing, []);
