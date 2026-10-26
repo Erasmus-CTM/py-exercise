@@ -1003,7 +1003,7 @@
     // Editors appear as soon as Monaco is ready; Python loads in the
     // background and the first Check waits for it (and reports a failure).
     ensurePyodide().catch(function (error) {
-      console.warn('py-exercise: Pyodide preload failed (will retry on Check):', error);
+      console.warn('py-exercise: Pyodide preload failed (use Retry to restart Python):', error);
     });
     var monaco = ensureMonaco();
     var ready = null;
