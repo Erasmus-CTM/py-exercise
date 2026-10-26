@@ -5,6 +5,19 @@ from unittest.mock import patch
 import test_example_checks as harness
 
 class WorkerOutput(unittest.TestCase):
+    def test_plot_cleanup_failure_still_restores_stdout_and_shared_guard(self):
+        module = harness.browser_module()
+        restored = []
+        module._ctm_guard = types.SimpleNamespace(snapshot=lambda: {}, restore=lambda state: restored.append(True))
+        def fail():
+            raise RuntimeError('plot cleanup failed')
+        module._plots_begin = lambda *args: fail
+        stdout = sys.stdout
+        with self.assertRaisesRegex(RuntimeError, 'plot cleanup failed'):
+            module.run('print("answer")', 'assert True', harness.MESSAGES)
+        self.assertIs(sys.stdout, stdout)
+        self.assertEqual(restored, [True])
+
     def test_private_plot_does_not_publish_an_image_or_fail_an_authored_test(self):
         module = harness.browser_module()
         plt = types.ModuleType('matplotlib.pyplot')
