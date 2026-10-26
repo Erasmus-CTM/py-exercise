@@ -35,7 +35,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Verify the bounded library input
         run: |
           test "$(git -C _assets-libs-source rev-parse HEAD)" = "$ASSETS_LIB_REF"
