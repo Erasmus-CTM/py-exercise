@@ -59,3 +59,16 @@ Developed by the **CTM team** for the Erasmus+ project
 **“Computational Thinking makes sense of Mathematics”**
 (**2023-1-NO01-KA220-HED-000166744**).
 [Funding and acknowledgements](docs/acknowledgements.md).
+# Standalone Python worker
+
+Python programs and authored tests run in the page's shared `CTMWorker` rather
+than on the browser's main thread. The editor remains responsive during a
+runaway program. Stop and stop-after use an interrupt when isolated, with a
+bounded terminate/restart fallback; a restart clears Python variables, retains
+the editor text and does not replay cancelled checks. Infrastructure failures
+and output overflow do not publish a grade.
+
+Learner stdout streams to the exercise, `plt.show()` produces PNG images, and
+authored-test output stays private. Interactive `input()` requires a secure,
+cross-origin isolated page; otherwise the exercise explains the limitation
+without recording a verdict. Output and images have bounded capture budgets.

@@ -11,7 +11,7 @@ permissions:
 
 env:
   # Source-reviewed combined store/assets input; final integration gates remain separate.
-  ASSETS_LIB_REF: 6f464e687e47282b3faebed27317c48dd8ad70ff
+  ASSETS_LIB_REF: 34af5e71defb65f4ff2d686266cc9c2612624fc2
 
 jobs:
   guards:

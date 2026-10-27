@@ -12,6 +12,9 @@ local stopAfter = 20
 local INSTALL = "quarto add https://erasmus-ctm.github.io/ctm-assessment/ctm-assessment.tar.gz"
 
 local function requireAssets()
+  if type(ctm.runtime.page) ~= "function" then
+    ctm.fail("P13 requires an updated CTM Assessment page-worker runtime. Reinstall CTM Assessment: " .. INSTALL)
+  end
   local assets = ctm.assets
   if type(assets) ~= "table" or type(assets.use) ~= "function" or type(assets.mode) ~= "function" then
     ctm.fail("py-exercise needs the shared assets API. Update CTM Assessment: " .. INSTALL)
@@ -188,7 +191,7 @@ local function ensureExerciseSetup()
 
   ctm.layout.use()
   ctm.assets.use()
-  ctm.runtime.use()
+  ctm.runtime.page()
   ctm.locale.use("py-exercise")
   local version = extensionVersion()
   if feedbackEnabled then

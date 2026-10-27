@@ -57,7 +57,7 @@ function page(exercises, { monaco = true, monacoDelay = 0, editorDelay = monacoD
   w.__pyExerciseConfig = { submission: false, lang: 'en' };
   w.__pyExercises = exercises;
   let requireCalls = 0;
-  w.require = (deps, ok, fail) => { const call=++requireCalls; return setTimeout(() => {
+  w.require = (deps, ok, fail) => { if(typeof deps==='string')return {}; const call=++requireCalls; return setTimeout(() => {
     if(secondRequireError && call>1) fail(secondRequireError);
     else if(monaco) ok(); else fail(new Error('offline'));
   }, call > 1 ? editorDelay : monacoDelay); };
@@ -169,7 +169,12 @@ test('Python that never finishes loading reports a message and a later Check ret
   const { w, dom } = page(exercises().slice(0, 1));
   let loads = 0;
   w.__qExercisePyodideTimeout = 100;
-  w.loadPyodide = () => (++loads === 1 ? new Promise(() => {}) : Promise.resolve(fakeInterpreter()));
+  let pending;
+  w.CTMWorker = {page: () => {
+    if (!pending) pending = ++loads === 1 ? new Promise(() => {}) : Promise.resolve(fakeInterpreter());
+    setTimeout(() => { pending = null; }, 100);
+    return pending;
+  }};
   w.eval(source);
   await until(() => w.document.querySelector('.py-exercise-check'));
   await tick(20);
@@ -244,7 +249,7 @@ test('a package load that never finishes still offers Stop, after the load limit
   dom.window.close();
 });
 
-test('a Stop from another component is reported as stopped, and queued checks then run', async () => {
+test('a Stop from another component cancels active and queued checks without grading or replay', async () => {
   const { w, dom } = page(exercises());
   w.__pyExerciseSlowCheckMs = 30;
   const interpreter = fakeInterpreter();
@@ -261,8 +266,9 @@ test('a Stop from another component is reported as stopped, and queued checks th
   a.click(); b.click();
   await until(() => w.document.querySelector('.py-exercise-stop'));
   w.MathExerciseRuntime.stop('another component');   // as math-exercise's Stop would
-  // The running check reports the stop; the one queued behind it then runs normally.
-  await until(() => /Stopped/.test(result(w, 1)) && /0 of 1|passed/.test(result(w, 2)));
+  // Both submitted operations are cancelled. No hidden replay on a new runtime.
+  await until(() => /Stopped/.test(result(w, 1)) && /Stopped/.test(result(w, 2)));
+  assert.equal(interpreter.runs, 0);
   assert.doesNotMatch(result(w, 1) + result(w, 2), /Unexpected error/);
   dom.window.close();
 });
@@ -563,7 +569,7 @@ test('local editor and Python failures name the course server, not a CDN', async
   assert.match(editorText,/server/);assert.doesNotMatch(editorText,/cdn\.jsdelivr\.net/);
   editor.dom.window.close();
   const python=page(exercises().slice(0,1),{assetMode:'local'});
-  python.w.loadPyodide=async()=>{throw new Error('Failed to load: https://course.test/_ctm-assets/pyodide/pyodide.js');};
+  python.w.CTMWorker={page:async()=>{throw new Error('Failed to load: https://course.test/site_libs/pyodide-worker-core.js');}};
   python.w.eval(source);await until(()=>python.w.document.querySelector('.py-exercise-check'));
   await tick(20);python.w.document.querySelector('.py-exercise-check').click();
   await until(()=>python.w.document.querySelector('.py-exercise-result .py-exercise-error'));
